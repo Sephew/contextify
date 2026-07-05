@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Contextify — Framework Retrieval Demo</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    max-width: 720px; margin: 0 auto; padding: 2.5rem 1.5rem;
+    background: #0f172a; color: #e2e8f0;
+  }
+  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+  p.sub { color: #94a3b8; margin-top: 0; margin-bottom: 2rem; font-size: 0.9rem; }
+  textarea {
+    width: 100%; min-height: 120px; box-sizing: border-box;
+    background: #1e293b; color: #e2e8f0; border: 1px solid #334155;
+    border-radius: 8px; padding: 0.75rem; font-size: 0.95rem; resize: vertical;
+  }
+  button {
+    margin-top: 0.75rem; background: #4f46e5; color: white; border: none;
+    padding: 0.6rem 1.4rem; border-radius: 6px; font-size: 0.95rem; cursor: pointer;
+  }
+  button:disabled { background: #475569; cursor: default; }
+  #result { margin-top: 2rem; }
+  .card {
+    background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+  }
+  .path { color: #94a3b8; font-size: 0.85rem; margin-bottom: 0.25rem; }
+  .fw-name { font-size: 1.3rem; font-weight: 600; margin: 0 0 0.5rem 0; }
+  .badge {
+    display: inline-block; font-size: 0.75rem; padding: 0.15rem 0.55rem;
+    border-radius: 999px; margin-left: 0.5rem; vertical-align: middle;
+  }
+  .badge.low { background: #7c2d12; color: #fed7aa; }
+  .rationale { color: #cbd5e1; margin-top: 0.75rem; line-height: 1.5; }
+  .meta { margin-top: 1rem; font-size: 0.8rem; color: #64748b; }
+  .bar-track { background: #334155; border-radius: 999px; height: 6px; margin-top: 0.75rem; overflow: hidden; }
+  .bar-fill { background: #4f46e5; height: 100%; }
+  .error { color: #fca5a5; }
+  .examples { margin-top: 0.75rem; font-size: 0.8rem; }
+  .examples button {
+    background: #1e293b; border: 1px solid #334155; color: #94a3b8;
+    padding: 0.3rem 0.6rem; font-size: 0.75rem; margin: 0.25rem 0.35rem 0 0; border-radius: 999px;
+  }
+</style>
+</head>
+<body>
+  <h1>Contextify</h1>
+  <p class="sub">Retrieve the right reasoning framework for a problem — not similar code, the correct way of thinking about it. Covers the Debugging and Testing branches.</p>
+
+  <textarea id="input" placeholder="Describe a bug, or a testing concern — e.g. &quot;Tests fail intermittently on CI only, pass locally, no stack trace&quot;"></textarea>
+  <div class="examples">
+    <button type="button" data-ex="Users report the page crashes sometimes but I can never reproduce it locally, no stack trace available.">Example: flaky crash</button>
+    <button type="button" data-ex="I want to make sure my new date-parsing function is well tested before merging, need good test coverage.">Example: test coverage</button>
+    <button type="button" data-ex="This worked yesterday and now every request returns stale data until I restart the server.">Example: stale data</button>
+  </div>
+  <br/>
+  <button id="submit">Get framework</button>
+
+  <div id="result"></div>
+
+<script>
+const API_KEY = "__API_KEY__";
+
+document.querySelectorAll('.examples button').forEach(b => {
+  b.addEventListener('click', () => { document.getElementById('input').value = b.dataset.ex; });
+});
+
+document.getElementById('submit').addEventListener('click', async () => {
+  const input = document.getElementById('input').value.trim();
+  const resultEl = document.getElementById('result');
+  const btn = document.getElementById('submit');
+  if (!input) { return; }
+
+  btn.disabled = true;
+  btn.textContent = "Thinking...";
+  resultEl.innerHTML = "";
+
+  try {
+    const res = await fetch('/retrieve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+      body: JSON.stringify({ raw_input: input })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      resultEl.innerHTML = `<div class="card error">Error: ${data.detail || res.status}</div>`;
+      return;
+    }
+    const confPct = Math.round(data.confidence * 100);
+    const lowBadge = data.low_confidence
+      ? '<span class="badge low">low confidence — ambiguous match</span>' : '';
+    resultEl.innerHTML = `
+      <div class="card">
+        <div class="path">${data.path.join(' → ')}</div>
+        <div class="fw-name">${data.framework_name}${lowBadge}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${confPct}%"></div></div>
+        <div class="rationale">${data.rationale}</div>
+        <div class="meta">
+          symptom: ${data.abstraction.symptom}<br/>
+          reproducibility: ${data.abstraction.reproducibility} &middot;
+          goal: ${data.abstraction.goal_shape} &middot;
+          evidence: ${data.abstraction.evidence_available.join(', ') || 'none'}
+          ${data.cache_hit ? '<br/>(served from path cache)' : ''}
+        </div>
+      </div>`;
+  } catch (e) {
+    resultEl.innerHTML = `<div class="card error">Request failed: ${e}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Get framework";
+  }
+});
+</script>
+</body>
+</html>

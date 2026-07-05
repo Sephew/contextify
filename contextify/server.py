@@ -9,9 +9,11 @@ Auth is a single static API key checked against CONTEXTIFY_API_KEY.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Security
+from fastapi.responses import HTMLResponse
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 
@@ -100,6 +102,23 @@ async def reflect_endpoint(req: ReflectRequest) -> dict:
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     return _reflection_to_dict(result)
+
+
+_DEMO_TEMPLATE = Path(__file__).parent / "templates" / "demo.html"
+
+
+@app.get("/", response_class=HTMLResponse)
+async def demo() -> str:
+    """Single-page demo UI: paste a problem, get back the matched framework.
+
+    The API key is injected server-side (read from the same env var
+    _require_api_key checks) so the page's fetch() calls work without the
+    visitor typing it in — fine for a demo, not a substitute for real
+    per-user auth if this page is ever exposed beyond that.
+    """
+    html = _DEMO_TEMPLATE.read_text(encoding="utf-8")
+    api_key = os.getenv("CONTEXTIFY_API_KEY", "")
+    return html.replace("__API_KEY__", api_key)
 
 
 @app.get("/health")
