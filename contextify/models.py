@@ -137,6 +137,10 @@ class FrameworkMatch:
     # True when this match came from the path cache (a similar abstracted
     # schema was already resolved) instead of a fresh tree-descent LLM call.
     cache_hit: bool = False
+    # Id of a provisional Framework auto-drafted because this match was
+    # low-confidence (the tree fit the problem poorly). None when nothing was
+    # drafted. The draft enters the promotion gate and is eligible next time.
+    drafted_framework_id: str | None = None
 
     @property
     def framework_name(self) -> str:

@@ -9,15 +9,58 @@ system collapsing into a single prompt template.
 from __future__ import annotations
 
 import asyncio
+import re
 
 from .framework_store import build_seeded_store
+from .framework_store.promotion import new_provisional_framework
 from .framework_store.store import FrameworkStore
 from .llm import LLMClient, MockLLMClient
-from .models import FrameworkMatch, ReflectionResult
+from .models import Framework, FrameworkMatch, ProblemAbstraction, ReflectionResult
 from .problem_abstraction import abstract
 from .reflection import MatchHistory
 from .reflection import reflect as _reflect
 from .retrieval import PathCache, resolve
+
+# When a retrieval lands at or below this derived confidence (or is flagged
+# ambiguous), the tree fit the problem poorly — auto_draft mode proposes a new
+# provisional framework for that shape rather than silently returning a weak pick.
+DRAFT_CONFIDENCE_FLOOR = 0.5
+
+
+async def _maybe_draft(
+    abstraction: ProblemAbstraction,
+    match: FrameworkMatch,
+    tree: list[Framework],
+    store: FrameworkStore,
+    llm: LLMClient,
+) -> Framework | None:
+    """Draft + seed one provisional framework as a sibling of the weak match.
+
+    Returns the new Framework, or None if it couldn't/needn't draft (the match
+    is a branch root, drafting failed, or an identically-named framework already
+    exists — so repeated low-confidence hits on the same shape don't duplicate)."""
+    near = match.framework
+    if near.parent is None:  # only ever draft sibling leaves, never a branch root
+        return None
+    try:
+        draft = llm.draft_framework(abstraction, tree, near)
+    except Exception:
+        return None  # a model/parse hiccup must not fail the retrieval itself
+    slug = re.sub(r"[^a-z0-9]+", "_", draft.name.lower()).strip("_")
+    if not slug:
+        return None
+    framework_id = f"fw.{slug}"
+    if await store.get(framework_id) is not None:
+        return None
+    framework = new_provisional_framework(
+        id=framework_id,
+        name=draft.name,
+        branch=near.branch,
+        parent=near.parent,
+        applicability_condition=draft.applicability_condition,
+    )
+    await store.seed([framework])
+    return framework
 
 # Process-lifetime defaults so a plain `retrieve_framework(...)` followed by
 # `reflect(match.match_id, ...)` works with no store/history/cache threaded
@@ -44,6 +87,7 @@ async def aretrieve_framework(
     history: MatchHistory | None = None,
     problem_id: str | None = None,
     cache: PathCache | None = None,
+    auto_draft: bool = False,
 ) -> FrameworkMatch:
     """Async core: abstract the problem, read the tree, resolve the framework.
 
@@ -73,6 +117,14 @@ async def aretrieve_framework(
     tree = await store.read_tree()
     match = resolve(abstraction, tree, llm, cache=cache)  # stage 2: cached or one LLM call
     history.record(match.match_id, problem_id or match.match_id, match.framework.id)
+
+    # Low confidence means the tree had no good-fitting framework. In auto_draft
+    # mode, propose one and drop it into the promotion gate (provisional, under-
+    # weighted) so it's eligible next time and promotes if it proves out.
+    if auto_draft and (match.low_confidence or match.confidence < DRAFT_CONFIDENCE_FLOOR):
+        drafted = await _maybe_draft(abstraction, match, tree, store, llm)
+        if drafted is not None:
+            match.drafted_framework_id = drafted.id
     return match
 
 
@@ -83,6 +135,7 @@ def retrieve_framework(
     history: MatchHistory | None = None,
     problem_id: str | None = None,
     cache: PathCache | None = None,
+    auto_draft: bool = False,
 ) -> FrameworkMatch:
     """Synchronous facade over :func:`aretrieve_framework` for CLI/simple use.
 
@@ -107,6 +160,7 @@ def retrieve_framework(
             history=history,
             problem_id=problem_id,
             cache=cache,
+            auto_draft=auto_draft,
         )
     )
 

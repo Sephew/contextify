@@ -44,6 +44,18 @@ class LLMRetrievalDecision:
     ambiguous: bool = False
 
 
+@dataclass
+class DraftedFramework:
+    """A new reasoning framework proposed for a problem the tree fit poorly.
+
+    Assembled into a provisional Framework by the caller, which supplies the
+    branch/parent (a sibling of the weak match) and a store id."""
+
+    name: str
+    applicability_condition: list[str]
+    rationale: str = ""
+
+
 class LLMClient(Protocol):
     """What abstraction + retrieval depend on. Keep this tiny."""
 
@@ -54,6 +66,13 @@ class LLMClient(Protocol):
     ) -> LLMRetrievalDecision: ...
 
     def solve_with_framework(self, raw_text: str, framework: Framework) -> str: ...
+
+    def draft_framework(
+        self,
+        abstraction: ProblemAbstraction,
+        tree: list[Framework],
+        near_match: Framework,
+    ) -> DraftedFramework: ...
 
 
 # --------------------------------------------------------------------------- #
@@ -246,6 +265,46 @@ class OpenRouterClient:
             f"Problem:\n{raw_text}"
         )
         return self._chat(system, user).strip()
+
+    def draft_framework(
+        self,
+        abstraction: ProblemAbstraction,
+        tree: list[Framework],
+        near_match: Framework,
+    ) -> DraftedFramework:
+        parent = next((f for f in tree if f.id == near_match.parent), None)
+        parent_name = parent.name if parent else "the branch"
+        siblings = [
+            f for f in tree if f.parent == near_match.parent and f.id != near_match.id
+        ]
+        siblings_block = "\n".join(
+            f"- {s.name}: {', '.join(s.applicability_condition) or '(none)'}"
+            for s in [near_match, *siblings]
+        ) or "(none)"
+        system = (
+            "You design reasoning frameworks — named ways of thinking about a "
+            "class of problem. Output only the requested JSON."
+        )
+        user = (
+            "An existing-framework retrieval was low-confidence for this problem: "
+            "no leaf clearly fits. Propose ONE new reasoning framework to sit as a "
+            f"sibling leaf under \"{parent_name}\" in the {near_match.branch.value} "
+            "branch. It must be genuinely distinct from the existing siblings and "
+            "fit THIS problem's shape.\n\n"
+            f"Abstracted problem:\n{abstraction.to_prompt_block()}\n\n"
+            f"Existing sibling leaves (name — checklist):\n{siblings_block}\n\n"
+            "applicability_condition is a checklist in the same 'key: value' style "
+            "as the siblings (keys like reproducibility, goal_shape, "
+            "evidence_available). Output ONLY JSON:\n"
+            '{"name": "<short distinctive name>", "applicability_condition": '
+            '["<key: value>", ... 2-4 lines], "rationale": "<one sentence>"}'
+        )
+        data = _extract_json(self._chat(system, user))
+        return DraftedFramework(
+            name=str(data["name"]).strip(),
+            applicability_condition=[str(x) for x in data.get("applicability_condition", [])],
+            rationale=str(data.get("rationale", "")),
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -451,6 +510,26 @@ class MockLLMClient:
             confidence=confidence,
             rationale=rationale,
             ambiguous=ambiguous,
+        )
+
+    def draft_framework(
+        self,
+        abstraction: ProblemAbstraction,
+        tree: list[Framework],
+        near_match: Framework,
+    ) -> DraftedFramework:
+        """Deterministic offline draft: names a framework from the problem shape
+        and mirrors the abstraction's structural fields into its checklist."""
+        stem = " ".join(abstraction.symptom.split()[:3]).strip(" .,:;").title() or "Problem"
+        conditions = [
+            f"reproducibility: {abstraction.reproducibility.value}",
+            f"goal_shape: {abstraction.goal_shape.value}",
+        ]
+        conditions += [f"evidence_available: {e.value}" for e in abstraction.evidence_available]
+        return DraftedFramework(
+            name=f"{stem} Framework",
+            applicability_condition=conditions,
+            rationale="offline draft mirroring the problem's abstracted shape",
         )
 
     def solve_with_framework(self, raw_text: str, framework: Framework) -> str:

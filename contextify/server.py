@@ -96,6 +96,7 @@ def _match_to_dict(match: FrameworkMatch) -> dict:
         "rationale": match.rationale,
         "low_confidence": match.low_confidence,
         "cache_hit": match.cache_hit,
+        "drafted_framework_id": match.drafted_framework_id,
         "abstraction": {
             "symptom": match.abstraction.symptom,
             "reproducibility": match.abstraction.reproducibility.value,
@@ -138,7 +139,7 @@ async def retrieve(req: RetrieveRequest) -> dict:
     try:
         raw_input = await _enrich(req.raw_input, req.repo_url)
         match = await aretrieve_framework(
-            raw_input, llm=_choose_client(), problem_id=req.problem_id
+            raw_input, llm=_choose_client(), problem_id=req.problem_id, auto_draft=True
         )
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc

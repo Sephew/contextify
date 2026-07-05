@@ -330,6 +330,13 @@
     color: var(--oxblood); border: 1px solid var(--oxblood); border-radius: 3px;
     padding: 0.25rem 0.55rem;
   }
+  .draft-note {
+    margin-top: 0.9rem; padding: 0.5rem 0.7rem; border-radius: 3px;
+    font-family: "IBM Plex Mono", monospace; font-size: 0.72rem; line-height: 1.5;
+    color: var(--blue); border: 1px solid var(--blue);
+  }
+  .draft-note strong { font-weight: 600; }
+  .draft-note code { background: var(--line); padding: 0 0.25rem; border-radius: 2px; }
 
   /* ---- solve-with-framework ------------------------------------------- */
   .solve-block { margin-top: 1.4rem; padding-top: 1.25rem; border-top: 1px dashed var(--line-2); }
@@ -807,8 +814,12 @@ document.getElementById('submit').addEventListener('click', async () => {
     logLine("walking the framework tree across the Debugging + Testing branches…");
     const data = await apiPost('/retrieve', payload);
     logLine("terminal framework reached", 'done');
+    if (data.drafted_framework_id) {
+      logLine(`low confidence — drafted a new provisional framework: ${data.drafted_framework_id}`, 'done');
+    }
 
     renderResult(data, input);
+    if (data.drafted_framework_id) loadFrameworks();   // show the new node in the tree
   } catch (e) {
     logLine(String(e), 'err');
     resultEl.innerHTML = `<div class="result-error">Request failed — ${escapeHtml(String(e))}</div>`;
@@ -838,6 +849,11 @@ function renderResult(data, rawInput) {
     ? `<div class="low-note">low confidence — the match was ambiguous</div>` : '';
   const cacheNote = data.cache_hit
     ? ` · served from path cache` : '';
+  const draftNote = data.drafted_framework_id
+    ? `<div class="draft-note">Confidence was low, so a new <strong>provisional</strong> framework
+         <code>${escapeHtml(data.drafted_framework_id)}</code> was drafted for this problem shape and
+         added to the tree below. It enters the promotion gate — eligible for retrieval now,
+         promoted to trusted after 3 validated successes.</div>` : '';
 
   resultEl.innerHTML = `
     <div class="readout">
@@ -858,6 +874,7 @@ function renderResult(data, rawInput) {
           </div>
           <div class="bar-track"><div class="bar-fill${data.low_confidence ? ' low' : ''}" id="conf-fill"></div></div>
           ${lowNote}
+          ${draftNote}
           <div class="rationale">${escapeHtml(data.rationale)}</div>
           <div class="solve-block">
             <button class="solve-btn" id="solve-btn">Solve with this framework</button>
