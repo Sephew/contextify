@@ -9,6 +9,7 @@ piece per the PRD — treat it as a hypothesis, not settled truth.
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -51,6 +52,21 @@ class FrameworkStatus(str, Enum):
 
     SEEDED = "seeded"          # hand-authored, trusted
     PROVISIONAL = "provisional"  # improvised, needs validation before it's trusted
+
+
+class ReflectionOutcome(str, Enum):
+    """Ground-truth ``outcome`` values reflect() accepts (PRD "Reflection ground
+    truth"), branch-specific: Debugging is judged by repro pass/fail, Testing by
+    mutation-catching/coverage. A Debugging outcome against a Testing-branch match
+    (or vice versa) is a caller bug — reflect() rejects it rather than silently
+    treating it as a generic success/failure bit.
+    """
+
+    REPRO_NOW_PASSES = "repro_now_passes"      # Debugging success
+    REPRO_STILL_FAILS = "repro_still_fails"    # Debugging failure
+    MUTATION_CAUGHT = "mutation_caught"        # Testing success
+    COVERAGE_INCREASED = "coverage_increased"  # Testing success
+    NO_IMPROVEMENT = "no_improvement"          # Testing failure
 
 
 @dataclass
@@ -111,6 +127,8 @@ class FrameworkMatch:
     # close together, so this match should be treated as a flagged guess rather
     # than a confident pick.
     low_confidence: bool = False
+    # Identifies this match for a later reflect(match_id, outcome) call.
+    match_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     @property
     def framework_name(self) -> str:
@@ -123,9 +141,19 @@ class FrameworkMatch:
 
 @dataclass
 class ReflectionResult:
-    """Result of the reflect seam (write-back). Stubbed in this slice."""
+    """Result of the reflect seam (write-back)."""
 
     match_id: str
     outcome: str
     store_changed: bool = False
     note: str = ""
+    success: bool = False
+    confidence_before: float = 0.0
+    confidence_after: float = 0.0
+    # Lagging misfit signal: True when this success followed 3+ distinct
+    # Frameworks tried for the same problem (retrying the same Framework
+    # doesn't count — that's an execution issue, not a fit issue).
+    misfit_detected: bool = False
+    # Tree distance from the first-tried Framework to the one that eventually
+    # succeeded; only meaningful when misfit_detected is True.
+    tree_distance: int | None = None

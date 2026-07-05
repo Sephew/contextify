@@ -1,7 +1,11 @@
+import asyncio
+
 import pytest
 
-from contextify import retrieve_framework
+from contextify import reflect, retrieve_framework
+from contextify.framework_store import build_seeded_store
 from contextify.models import Branch
+from contextify.reflection import MatchHistory
 
 from .fixtures import DEBUGGING_CASES
 
@@ -28,8 +32,20 @@ def test_retrieve_framework_rejects_empty_input():
         retrieve_framework("   ")
 
 
-def test_reflect_seam_is_stubbed_not_silently_passing():
-    from contextify import reflect
+def test_reflect_rejects_unknown_match_id():
+    with pytest.raises(ValueError):
+        reflect("some-match-id", "fixed", store=asyncio.run(build_seeded_store()), history=MatchHistory())
 
-    with pytest.raises(NotImplementedError):
-        reflect("some-match-id", "fixed")
+
+def test_reflect_round_trips_a_real_retrieve_framework_match():
+    store = asyncio.run(build_seeded_store())
+    history = MatchHistory()
+    case = DEBUGGING_CASES[0]
+
+    match = retrieve_framework(case["raw_text"], store=store, history=history)
+    result = reflect(match.match_id, "repro_now_passes", store=store, history=history)
+
+    # Seeded frameworks start at confidence 1.0 (the ceiling); a lone success
+    # has no headroom to rise, but the store must still reflect the outcome.
+    assert result.success is True
+    assert result.confidence_after == result.confidence_before == 1.0

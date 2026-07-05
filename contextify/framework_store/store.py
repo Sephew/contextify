@@ -60,6 +60,14 @@ class FrameworkStore(ABC):
                 return f
         return None
 
+    async def set_confidence(self, framework_id: str, confidence: float) -> None:
+        """Update a Framework node's confidence weight in place (reflect()'s
+        write-back). Default: unsupported; override where the backend can
+        actually mutate node state (see InMemoryGraphStore)."""
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support confidence write-back"
+        )
+
 
 class InMemoryGraphStore(FrameworkStore):
     """A real graph (nodes + parent/child adjacency), no external backend needed."""
@@ -81,6 +89,12 @@ class InMemoryGraphStore(FrameworkStore):
 
     async def get(self, framework_id: str) -> Framework | None:
         return self._nodes.get(framework_id)
+
+    async def set_confidence(self, framework_id: str, confidence: float) -> None:
+        node = self._nodes.get(framework_id)
+        if node is None:
+            raise KeyError(f"unknown framework id {framework_id!r}")
+        node.confidence = confidence
 
     async def children_of(self, framework_id: str | None) -> list[Framework]:
         return [self._nodes[c] for c in self._children.get(framework_id, [])]

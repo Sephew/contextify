@@ -12,7 +12,7 @@ Public API::
 
 from __future__ import annotations
 
-from .api import aretrieve_framework, reflect, retrieve_framework
+from .api import aretrieve_framework, areflect, reflect, retrieve_framework
 from .llm import LLMClient, MockLLMClient, OpenRouterClient
 from .models import (
     Branch,
@@ -22,9 +22,11 @@ from .models import (
     FrameworkStatus,
     GoalShape,
     ProblemAbstraction,
+    ReflectionOutcome,
     ReflectionResult,
     Reproducibility,
 )
+from .reflection import MatchHistory
 
 __version__ = "0.1.0"
 
@@ -33,6 +35,7 @@ __all__ = [
     "retrieve_framework",
     "aretrieve_framework",
     "reflect",
+    "areflect",
     # llm clients
     "LLMClient",
     "MockLLMClient",
@@ -44,7 +47,9 @@ __all__ = [
     "FrameworkMatch",
     "FrameworkStatus",
     "GoalShape",
+    "MatchHistory",
     "ProblemAbstraction",
+    "ReflectionOutcome",
     "ReflectionResult",
     "Reproducibility",
     "__version__",
