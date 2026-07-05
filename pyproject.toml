@@ -12,22 +12,12 @@ dependencies = [
     "uvicorn>=0.29.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.0.0",
-    "pytest-asyncio>=0.23.0",
-]
-
 [project.scripts]
 contextify = "contextify.demo:main"
 contextify-server = "contextify.server:main"
 
 [tool.setuptools.packages.find]
 include = ["contextify*"]
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-testpaths = ["tests"]
 
 [build-system]
 requires = ["setuptools>=68"]

@@ -9,14 +9,13 @@ tree-distance severity), a human-in-the-loop promotion gate for new
 provisional frameworks, and path caching keyed on abstracted-schema
 similarity.
 
-Full design context: [`.scratch/framework-retrieval-system/PRD.md`](.scratch/framework-retrieval-system/PRD.md),
-[`framework-retrieval-system.md`](framework-retrieval-system.md), glossary in
-[`CONTEXT.md`](CONTEXT.md). Issue tracker: [`issues/done/`](issues/done/).
+Full design context: [`framework-retrieval-system.md`](framework-retrieval-system.md),
+glossary in [`CONTEXT.md`](CONTEXT.md).
 
 ## Setup
 
 ```bash
-pip install -e ".[dev]"
+pip install -e .
 cp .env.example .env   # add your OPENROUTER_API_KEY
 ```
 
@@ -35,20 +34,11 @@ match = retrieve_framework("After the ORM upgrade, every run throws...")
 print(match.framework_name, match.path)
 ```
 
-## Tests
-
-```bash
-pytest                 # offline suite (mock LLM, in-memory store) — always runs
-```
-
-`tests/test_cognee_document_store.py` is a live integration test (real
-network/LLM/embedding calls); it self-skips unless `OPENROUTER_API_KEY` is set.
-
 ## Architecture
 
 - `models.py` — the four-field `ProblemAbstraction` schema + `Framework`/`FrameworkMatch`.
 - `llm.py` — the `LLMClient` seam: `OpenRouterClient` (live) and `MockLLMClient`
-  (deterministic, offline, used by the default test suite).
+  (deterministic, offline).
 - `problem_abstraction/` — raw text → `ProblemAbstraction`, one LLM call.
 - `framework_store/` — the persistent tree retrieval reads from. See below.
 - `retrieval/` — resolves the abstracted problem to a `FrameworkMatch`, one LLM
@@ -82,32 +72,16 @@ one `FrameworkStore` interface:
 
 | Store | Status | Notes |
 |---|---|---|
-| `InMemoryGraphStore` | **default**, fully offline | Real parent/child graph, no external dependency. Used by the offline test suite. |
-| `CogneeMemoryStore` | built, **validated working** | Built on Cognee's v1 memory API. `seed()` calls `cognee.remember()` to store each framework as a JSON document tagged `node_set=[framework.id]`; `read_tree()`/`get()` read it back via `cognee.recall(query_type=SearchType.CHUNKS, node_name=[...])`, whose `.text` returns the exact stored document. Write-backs (`set_confidence`/`set_status`/`increment_validated_successes`) delete the old chunk and re-`remember()` the updated document under the same `node_set`. This API sits on Cognee's vector store — distinct from the broken embedded graph backend (Ladybug/Kuzu), whose low-level `add_node`/`add_edge` engine emits a `MERGE ... SET n += {map}` query Cognee 1.2.2's own parser rejects. Verified empirically end-to-end through OpenRouter (LLM + embeddings). Requires `OPENROUTER_API_KEY`; not used by the default offline suite for that reason. |
+| `InMemoryGraphStore` | **default**, fully offline | Real parent/child graph, no external dependency. |
+| `CogneeMemoryStore` | built, **validated working** | Built on Cognee's v1 memory API. `seed()` calls `cognee.remember()` to store each framework as a JSON document tagged `node_set=[framework.id]`; `read_tree()`/`get()` read it back via `cognee.recall(query_type=SearchType.CHUNKS, node_name=[...])`, whose `.text` returns the exact stored document. Write-backs (`set_confidence`/`set_status`/`increment_validated_successes`) delete the old chunk and re-`remember()` the updated document under the same `node_set`. This API sits on Cognee's vector store — distinct from the broken embedded graph backend (Ladybug/Kuzu), whose low-level `add_node`/`add_edge` engine emits a `MERGE ... SET n += {map}` query Cognee 1.2.2's own parser rejects. Verified empirically end-to-end through OpenRouter (LLM + embeddings). Requires `OPENROUTER_API_KEY`. |
 
-This lines up with upstream's own Cognee spike
-(`spikes/cognee-retrieval-quality/VERDICT.md`): **GO**, 100% top-3 / 85% top-1
+This lines up with upstream's own Cognee spike: **GO**, 100% top-3 / 85% top-1
 accuracy — over the same vector-store embedding space `recall()` reads from.
-Their spike measured retrieval quality with vector search directly; this slice's
+That spike measured retrieval quality with vector search directly; this slice's
 retrieval mechanic is different (one LLM call resolves the whole tree path at
 once, per the PRD), so `CogneeMemoryStore` is used purely as a working *store*,
 with `read_tree()` returning the full tree for the single-call resolver — not
 per-query vector ranking.
-
-## Fixtures
-
-`tests/test_upstream_fixtures.py` ports all 20 cases (12 Debugging + 8 Testing)
-from the canonical Slice 0 spike fixture set
-(`spikes/cognee-retrieval-quality/fixtures.py`) and runs each raw_text through
-this package's actual `retrieve_framework()` seam (not Cognee vector search —
-this slice's retrieval mechanism is a single LLM call over the whole tree).
-`tests/fixtures.py` holds additional hand-authored adversarial cases (false
-friends / disguised twins). `tests/test_misfit.py` and `tests/test_reflect.py`
-cover the leading/lagging misfit signals and the reflection write-back
-respectively; `tests/test_promotion.py` covers the provisional → trusted
-promotion gate; `tests/test_path_cache.py` covers the descent-call cache
-(including that a call-counting spy confirms a hit actually skips the LLM
-call, not just that the result happens to match).
 
 ## Known limitations
 

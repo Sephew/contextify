@@ -17,14 +17,11 @@ Two implementations behind one interface:
   stored as one JSON-serialized document tagged with ``node_set=[framework.id]``
   via ``remember()``; ``read_tree()``/``get()`` read it back via
   ``recall(query_type=SearchType.CHUNKS, ...)``, whose ``.text`` carries the
-  raw stored document string back out (confirmed live — see
-  ``.scratch/cognee-native-framework-store/recall-spike-findings.md``). This is
-  the mechanism the upstream Cognee spike
-  (``spikes/cognee-retrieval-quality/VERDICT.md``) validated with a 100% top-3
-  / 85% top-1 result — confirming Cognee's embedding space handles this
-  system's structural-similarity needs, given a good abstraction. Requires
-  ``OPENROUTER_API_KEY`` (real network + LLM + embedding calls); not used by
-  the default offline test suite for that reason.
+  raw stored document string back out (confirmed live via OpenRouter). This
+  mechanism was validated with a 100% top-3 / 85% top-1 result — confirming
+  Cognee's embedding space handles this system's structural-similarity needs,
+  given a good abstraction. Requires ``OPENROUTER_API_KEY`` (real network +
+  LLM + embedding calls).
 """
 
 from __future__ import annotations
