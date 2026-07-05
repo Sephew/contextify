@@ -11,8 +11,7 @@ from .promotion import (
 )
 from .seed import ALL_FRAMEWORKS, DEBUGGING_FRAMEWORKS, TESTING_FRAMEWORKS
 from .store import (
-    CogneeDocumentStore,
-    CogneeFrameworkStore,
+    CogneeMemoryStore,
     FrameworkStore,
     InMemoryGraphStore,
 )
@@ -28,8 +27,7 @@ async def build_seeded_store(store: FrameworkStore | None = None) -> FrameworkSt
 __all__ = [
     "FrameworkStore",
     "InMemoryGraphStore",
-    "CogneeFrameworkStore",
-    "CogneeDocumentStore",
+    "CogneeMemoryStore",
     "DEBUGGING_FRAMEWORKS",
     "TESTING_FRAMEWORKS",
     "ALL_FRAMEWORKS",
