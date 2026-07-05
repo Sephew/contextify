@@ -1,4 +1,4 @@
-# 06 — Path caching for repeated/similar problem schemas
+# Slice 5 — Path caching for repeated/similar problem schemas
 
 Status: ready-for-agent
 
@@ -19,4 +19,4 @@ Cache resolved tree paths in `retrieve_framework`, keyed on abstracted-schema si
 
 ## Blocked by
 
-- `03-testing-branch-leading-misfit-signal`
+- `slice2-testing-branch-leading-misfit-signal`

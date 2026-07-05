@@ -1,4 +1,4 @@
-# 01 — Cognee retrieval-quality spike
+# Slice 0 — Cognee retrieval-quality spike
 
 Status: done
 
@@ -35,9 +35,9 @@ run_spike.py, results.json, VERDICT.md, README.md).
 - Hand-abstracted schema: 85% top-1 / **100% top-3**.
 - **Verdict: GO.** Gap is attributable to missing abstraction, not embedding-space
   weakness — Cognee's embedding space resolved every case once given the 4-field
-  abstraction. Proceed with issue 02's Problem Abstraction stage as designed.
+  abstraction. Proceed with Slice 1's Problem Abstraction stage as designed.
 
-Key environment notes for whoever picks up issue 02 (see spike README.md for full detail):
+Key environment notes for whoever picks up Slice 1 (see spike README.md for full detail):
 - No local OpenAI credits — used OpenRouter (`LLM_ENDPOINT` override) for the LLM and
   local `fastembed` for embeddings (OpenRouter has no embeddings endpoint).
 - Windows: Cognee's default data dirs under site-packages exceed MAX_PATH (260 chars)

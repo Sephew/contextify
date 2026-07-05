@@ -1,4 +1,4 @@
-# 05 — Human-in-the-loop promotion gate
+# Slice 4 — Human-in-the-loop promotion gate
 
 Status: ready-for-agent
 
@@ -22,4 +22,4 @@ A provisional Framework is promoted to trusted/seeded weight once either of two 
 
 ## Blocked by
 
-- `04-reflect-seam-ground-truth-misfit`
+- `slice3-reflect-seam-ground-truth-misfit`

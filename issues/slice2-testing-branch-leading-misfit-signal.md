@@ -1,4 +1,4 @@
-# 03 — Add Testing branch + leading misfit signal
+# Slice 2 — Add Testing branch + leading misfit signal
 
 Status: ready-for-agent
 
@@ -20,8 +20,8 @@ Add the leading misfit signal: when the top candidate Frameworks score ambiguous
 - [ ] `retrieve_framework` correctly picks Testing-branch frameworks for testing-goal problems and Debugging-branch frameworks for debugging-goal problems
 - [ ] Branch selection happens within the same single LLM call as leaf resolution
 - [ ] Ambiguously-close top candidates produce a flagged low-confidence result rather than a silent guess
-- [ ] Slice 01's full adversarial fixture set (false friends + disguised twins across both branches) runs as an automated regression suite and passes
+- [ ] Slice 0's full adversarial fixture set (false friends + disguised twins across both branches) runs as an automated regression suite and passes
 
 ## Blocked by
 
-- `02-debugging-retrieve-framework-tracer-bullet`
+- `slice1-debugging-retrieve-framework-tracer-bullet`

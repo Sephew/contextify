@@ -1,4 +1,4 @@
-# 04 — reflect seam: ground truth + lagging misfit + tree-distance severity
+# Slice 3 — reflect seam: ground truth + lagging misfit + tree-distance severity
 
 Status: ready-for-agent
 
@@ -25,4 +25,4 @@ On each reflection, write back to the Framework Store: adjust the matched Framew
 
 ## Blocked by
 
-- `03-testing-branch-leading-misfit-signal`
+- `slice2-testing-branch-leading-misfit-signal`

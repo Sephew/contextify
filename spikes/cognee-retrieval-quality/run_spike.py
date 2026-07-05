@@ -1,4 +1,4 @@
-"""Cognee retrieval-quality spike runner (issue 01).
+"""Cognee retrieval-quality spike runner (Slice 0).
 
 Seeds the Framework Store (frameworks.py) into Cognee once, then queries it
 twice per fixture case (fixtures.py): once with the raw problem text, once

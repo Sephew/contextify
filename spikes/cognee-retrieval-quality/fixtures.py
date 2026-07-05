@@ -2,7 +2,7 @@
 
 20 hand-built cases (10 false-friend pairs... actually 5 false-friend pairs +
 5 disguised-twin pairs = 20 cases) spanning the Debugging and Testing
-branches, per issue 01 / PRD `.scratch/framework-retrieval-system/PRD.md`.
+branches, per Slice 0 / PRD `.scratch/framework-retrieval-system/PRD.md`.
 
 - false_friend: lexically similar surface wording, but the correct Framework
   differs between the two cases in the pair (tests whether Cognee is fooled

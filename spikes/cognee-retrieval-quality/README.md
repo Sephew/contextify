@@ -1,6 +1,6 @@
 # Cognee retrieval-quality spike
 
-Answers issue 01's question: does Cognee's embedding space handle abstract/structural
+Answers Slice 0's question: does Cognee's embedding space handle abstract/structural
 similarity well enough to retrieve the right reasoning Framework? See `VERDICT.md` for
 the conclusion, `results.json` for raw numbers.
 
