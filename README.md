@@ -75,8 +75,6 @@ pip install -e .
 cp .env.example .env   # add your OPENROUTER_API_KEY
 ```
 
-No Cognee account needed — it's a local library. `.env` is git-ignored.
-
 ## Usage
 
 ```bash
