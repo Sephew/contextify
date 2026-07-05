@@ -291,6 +291,38 @@
     padding: 0.25rem 0.55rem;
   }
 
+  /* ---- solve-with-framework ------------------------------------------- */
+  .solve-block { margin-top: 1.4rem; padding-top: 1.25rem; border-top: 1px dashed var(--line-2); }
+  button.solve-btn {
+    font-family: "IBM Plex Sans", sans-serif; font-weight: 600; font-size: 0.9rem;
+    background: var(--blue); color: #fff; border: none;
+    padding: 0.62rem 1.25rem; border-radius: 4px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 0.5rem;
+  }
+  button.solve-btn::after { content: "→"; opacity: 0.85; }
+  button.solve-btn:hover { background: var(--ink); }
+  button.solve-btn:disabled { background: var(--ink-3); cursor: default; }
+  .solution-head {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.66rem;
+    text-transform: uppercase; letter-spacing: 0.14em; color: var(--blue);
+    margin: 0.2rem 0 0.6rem;
+  }
+  .solution { color: var(--ink); font-size: 0.96rem; line-height: 1.62; }
+  .solution h4 {
+    font-family: "Fraunces", serif; font-weight: 500; font-size: 1.08rem;
+    margin: 1.1rem 0 0.4rem;
+  }
+  .solution p { margin: 0.6rem 0; }
+  .solution ol, .solution ul { margin: 0.6rem 0; padding-left: 1.3rem; }
+  .solution li { margin-bottom: 0.4rem; }
+  .solution li::marker { color: var(--blue); font-family: "IBM Plex Mono", monospace; }
+  .solution strong { font-weight: 600; }
+  .solution code {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.85em;
+    background: var(--paper-2); padding: 0.05rem 0.32rem; border-radius: 3px;
+  }
+  .solution em { font-style: italic; color: var(--ink-2); }
+
   .error { color: var(--oxblood); }
   .result-error {
     border: 1px solid var(--oxblood); border-radius: 6px; padding: 1rem 1.25rem;
@@ -485,8 +517,8 @@
     <section class="block">
       <div class="block-head">
         <span class="kn">§</span>
-        <h2>The framework tree</h2>
-        <span class="note">Every retrieval walks this tree · click a framework to inspect</span>
+        <h2>Available frameworks</h2>
+        <span class="note">Every retrieval walks these · click a framework to inspect</span>
       </div>
       <div class="tree" id="frameworks-tree">
         <div class="loading">loading frameworks…</div>
@@ -690,7 +722,7 @@ document.getElementById('submit').addEventListener('click', async () => {
     const data = await apiPost('/retrieve', { raw_input: input });
     logLine("terminal framework reached", 'done');
 
-    renderResult(data);
+    renderResult(data, input);
   } catch (e) {
     logLine(String(e), 'err');
     resultEl.innerHTML = `<div class="result-error">Request failed — ${escapeHtml(String(e))}</div>`;
@@ -700,7 +732,7 @@ document.getElementById('submit').addEventListener('click', async () => {
   }
 });
 
-function renderResult(data) {
+function renderResult(data, rawInput) {
   const resultEl = document.getElementById('result');
   const a = data.abstraction;
   const confPct = Math.round(data.confidence * 100);
@@ -741,9 +773,17 @@ function renderResult(data) {
           <div class="bar-track"><div class="bar-fill${data.low_confidence ? ' low' : ''}" id="conf-fill"></div></div>
           ${lowNote}
           <div class="rationale">${escapeHtml(data.rationale)}</div>
+          <div class="solve-block">
+            <button class="solve-btn" id="solve-btn">Solve with this framework</button>
+            <div id="solution"></div>
+          </div>
         </div>
       </div>
     </div>`;
+
+  document.getElementById('solve-btn').addEventListener('click', (ev) =>
+    solveProblem(rawInput, data.framework_id, data.framework_name, ev.currentTarget)
+  );
 
   // trigger reveal + confidence fill after layout
   requestAnimationFrame(() => {
@@ -752,6 +792,54 @@ function renderResult(data) {
     if (fill) fill.style.width = confPct + '%';
   });
   resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// --- Solve the problem with the matched framework ------------------------
+async function solveProblem(rawInput, frameworkId, frameworkName, btn) {
+  const out = document.getElementById('solution');
+  btn.disabled = true;
+  btn.textContent = 'Solving…';
+  out.innerHTML = `<div class="loading">applying ${escapeHtml(frameworkName)}…</div>`;
+  try {
+    const res = await apiPost('/solve', { raw_input: rawInput, framework_id: frameworkId });
+    out.innerHTML =
+      `<div class="solution-head">Working it through ${escapeHtml(frameworkName)}</div>` +
+      `<div class="solution">${renderMarkdown(res.solution)}</div>`;
+    btn.style.display = 'none';
+  } catch (e) {
+    out.innerHTML = `<div class="result-error">Couldn't solve — ${escapeHtml(String(e))}</div>`;
+    btn.disabled = false;
+    btn.textContent = 'Solve with this framework';
+  }
+}
+
+// Minimal, safe markdown: escapes first, then adds bold/italic/code, lists, headings.
+function renderMarkdown(md) {
+  let h = escapeHtml(md)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+  const lines = h.split(/\r?\n/);
+  let out = '', list = null;
+  const closeList = () => { if (list) { out += `</${list}>`; list = null; } };
+  for (const raw of lines) {
+    const line = raw.trim();
+    let m;
+    if (!line) { closeList(); continue; }
+    if ((m = line.match(/^(\d+)[.)]\s+(.*)$/))) {
+      if (list !== 'ol') { closeList(); out += '<ol>'; list = 'ol'; }
+      out += `<li>${m[2]}</li>`;
+    } else if ((m = line.match(/^[-*]\s+(.*)$/))) {
+      if (list !== 'ul') { closeList(); out += '<ul>'; list = 'ul'; }
+      out += `<li>${m[1]}</li>`;
+    } else if ((m = line.match(/^#{1,6}\s+(.*)$/))) {
+      closeList(); out += `<h4>${m[1]}</h4>`;
+    } else {
+      closeList(); out += `<p>${line}</p>`;
+    }
+  }
+  closeList();
+  return out;
 }
 
 // --- Appendix toggles ----------------------------------------------------

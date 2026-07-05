@@ -53,6 +53,8 @@ class LLMClient(Protocol):
         self, abstraction: ProblemAbstraction, tree: list[Framework]
     ) -> LLMRetrievalDecision: ...
 
+    def solve_with_framework(self, raw_text: str, framework: Framework) -> str: ...
+
 
 # --------------------------------------------------------------------------- #
 # Prompt construction (shared by the real client; kept out of the mock)
@@ -189,6 +191,26 @@ class OpenRouterClient:
             rationale=str(data.get("rationale", "")),
             ambiguous=bool(data.get("ambiguous", False)),
         )
+
+    def solve_with_framework(self, raw_text: str, framework: Framework) -> str:
+        checklist = (
+            "\n".join(f"- {c}" for c in framework.applicability_condition)
+            or "- (none recorded)"
+        )
+        system = (
+            "You are a senior software engineer. Apply the given REASONING "
+            "FRAMEWORK to the problem — don't just answer, work the problem the "
+            "way the framework prescribes. Return concise GitHub-flavored "
+            "markdown: a one-line framing, then 3-6 numbered concrete steps "
+            "tailored to THIS problem, then a final 'What to look for:' line. No "
+            "preamble, no restating the problem."
+        )
+        user = (
+            f"Framework: {framework.name} (branch: {framework.branch.value})\n"
+            f"When it applies:\n{checklist}\n\n"
+            f"Problem:\n{raw_text}"
+        )
+        return self._chat(system, user).strip()
 
 
 # --------------------------------------------------------------------------- #
@@ -395,6 +417,28 @@ class MockLLMClient:
             rationale=rationale,
             ambiguous=ambiguous,
         )
+
+    def solve_with_framework(self, raw_text: str, framework: Framework) -> str:
+        """Deterministic offline stand-in: turns the framework's own
+        applicability checklist into a step-by-step application. Good enough for
+        the demo without a key; the live client returns a real tailored plan."""
+        conditions = framework.applicability_condition or [
+            "Frame the problem in this framework's terms."
+        ]
+        lines = [f"**{framework.name}** — applied to your problem:", ""]
+        for i, cond in enumerate(conditions, 1):
+            lines.append(f"{i}. Work the angle it prescribes — {cond}.")
+        lines.append("")
+        lines.append(
+            "What to look for: the first step where the framework's expectation "
+            "and what you actually observe diverge — that gap is your lead."
+        )
+        lines.append("")
+        lines.append(
+            "_Offline demo response. Set OPENROUTER_API_KEY for a fully "
+            "tailored, model-written solution._"
+        )
+        return "\n".join(lines)
 
     @staticmethod
     def _score(abstraction: ProblemAbstraction, leaf: Framework) -> int:

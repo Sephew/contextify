@@ -58,6 +58,11 @@ class AbstractRequest(BaseModel):
     raw_input: str
 
 
+class SolveRequest(BaseModel):
+    raw_input: str
+    framework_id: str
+
+
 class NewFrameworkRequest(BaseModel):
     name: str
     branch: str
@@ -150,6 +155,29 @@ async def abstract_endpoint(req: AbstractRequest) -> dict:
         "reproducibility": result.reproducibility.value,
         "evidence_available": [e.value for e in result.evidence_available],
         "goal_shape": result.goal_shape.value,
+    }
+
+
+@app.post("/solve", dependencies=[Depends(_require_api_key)])
+async def solve_endpoint(req: SolveRequest) -> dict:
+    """Applies the matched framework to the problem and returns a worked plan.
+
+    This is the "so what" step after /retrieve: retrieval tells you *how to
+    think* about the problem; /solve actually thinks it through in that
+    framework and returns concrete, tailored steps (markdown). One LLM call.
+    """
+    store = await _get_default_store()
+    framework = await store.get(req.framework_id)
+    if framework is None:
+        raise HTTPException(400, f"unknown framework id {req.framework_id!r}")
+    try:
+        solution = _choose_client().solve_with_framework(req.raw_input, framework)
+    except Exception as exc:  # keep the demo alive on a model/network hiccup
+        raise HTTPException(502, f"solve failed: {exc}") from exc
+    return {
+        "framework_id": framework.id,
+        "framework_name": framework.name,
+        "solution": solution,
     }
 
 
