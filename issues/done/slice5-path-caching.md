@@ -1,6 +1,6 @@
 # Slice 5 — Path caching for repeated/similar problem schemas
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 

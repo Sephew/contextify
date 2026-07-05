@@ -1,11 +1,13 @@
 # Contextify
 
 A Framework Retrieval System: retrieve the right *way of thinking* about a
-problem (a reasoning framework), not similar facts. Slices 1-4 are built:
-both the **Debugging** and **Testing** branches, single-call branch+leaf
-resolution with a leading misfit signal, the `reflect()` write-back seam
-(ground truth, confidence updates, lagging misfit, tree-distance severity),
-and a human-in-the-loop promotion gate for new provisional frameworks.
+problem (a reasoning framework), not similar facts. All five slices in the
+PRD are built: both the **Debugging** and **Testing** branches, single-call
+branch+leaf resolution with a leading misfit signal, the `reflect()`
+write-back seam (ground truth, confidence updates, lagging misfit,
+tree-distance severity), a human-in-the-loop promotion gate for new
+provisional frameworks, and path caching keyed on abstracted-schema
+similarity.
 
 Full design context: [`.scratch/framework-retrieval-system/PRD.md`](.scratch/framework-retrieval-system/PRD.md),
 [`framework-retrieval-system.md`](framework-retrieval-system.md), glossary in
@@ -50,7 +52,12 @@ network/LLM/embedding calls); it self-skips unless `OPENROUTER_API_KEY` is set.
 - `problem_abstraction/` — raw text → `ProblemAbstraction`, one LLM call.
 - `framework_store/` — the persistent tree retrieval reads from. See below.
 - `retrieval/` — resolves the abstracted problem to a `FrameworkMatch`, one LLM
-  call over the whole (small) tree.
+  call over the whole (small) tree. `retrieval/cache.py` (`PathCache`) sits in
+  front of that descent call: the three structured `ProblemAbstraction` fields
+  (`reproducibility`, `goal_shape`, `evidence_available`) must match exactly,
+  and `symptom` (free text) is compared via Jaccard token-overlap similarity —
+  a cache hit skips the descent LLM call entirely, surfaced as
+  `FrameworkMatch.cache_hit`.
 - `reflection/` — the write-back seam: `reflect(match_id, outcome)` checks a
   branch-specific ground truth (Debugging: repro pass/fail; Testing: mutation
   caught / coverage delta), strengthens/weakens the matched Framework's
@@ -99,11 +106,12 @@ this slice's retrieval mechanism is a single LLM call over the whole tree).
 friends / disguised twins). `tests/test_misfit.py` and `tests/test_reflect.py`
 cover the leading/lagging misfit signals and the reflection write-back
 respectively; `tests/test_promotion.py` covers the provisional → trusted
-promotion gate.
+promotion gate; `tests/test_path_cache.py` covers the descent-call cache
+(including that a call-counting spy confirms a hit actually skips the LLM
+call, not just that the result happens to match).
 
-## Known gaps (out of scope so far)
+## Known limitations
 
-- Path caching for repeated/similar problem schemas (Slice 5).
 - The 4-field abstraction schema is a first-cut hypothesis (per the PRD), not a
   fully solved classifier — `MockLLMClient`'s heuristic needed several rounds of
   real fixes (not fixture rewording) against the upstream + hand-authored
