@@ -77,23 +77,22 @@ network/LLM/embedding calls); it self-skips unless `OPENROUTER_API_KEY` is set.
 
 ### Framework Store: a finding worth knowing
 
-The issue asked for a "Cognee-backed" store. Three implementations exist behind
+The issue asked for a "Cognee-backed" store. Two implementations exist behind
 one `FrameworkStore` interface:
 
 | Store | Status | Notes |
 |---|---|---|
 | `InMemoryGraphStore` | **default**, fully offline | Real parent/child graph, no external dependency. Used by the offline test suite. |
-| `CogneeFrameworkStore` | built, **not usable here** | Drives Cognee's low-level graph engine (`add_node`/`add_edge`) directly. On this platform, Cognee 1.2.2's bundled embedded backend (Ladybug/Kuzu) emits a `MERGE ... SET n += {map}` query its own parser rejects — `add_node` fails outright. Kept behind the interface for when Cognee ships a working embedded backend or is pointed at an external one (Neo4j, etc). |
-| `CogneeDocumentStore` | built, **validated working** | Drives Cognee's own ingestion pipeline (`cognee.add` + `cognee.cognify`), which batches its graph writes through a different internal path that doesn't hit the bug above. Each framework is stored as a JSON document tagged `node_set=[framework.id]`; read back via `cognee.search(SearchType.CHUNKS)`. Verified empirically end-to-end through OpenRouter (LLM + embeddings). Requires `OPENROUTER_API_KEY`; not used by the default offline suite for that reason. |
+| `CogneeMemoryStore` | built, **validated working** | Built on Cognee's v1 memory API. `seed()` calls `cognee.remember()` to store each framework as a JSON document tagged `node_set=[framework.id]`; `read_tree()`/`get()` read it back via `cognee.recall(query_type=SearchType.CHUNKS, node_name=[...])`, whose `.text` returns the exact stored document. Write-backs (`set_confidence`/`set_status`/`increment_validated_successes`) delete the old chunk and re-`remember()` the updated document under the same `node_set`. This API sits on Cognee's vector store — distinct from the broken embedded graph backend (Ladybug/Kuzu), whose low-level `add_node`/`add_edge` engine emits a `MERGE ... SET n += {map}` query Cognee 1.2.2's own parser rejects. Verified empirically end-to-end through OpenRouter (LLM + embeddings). Requires `OPENROUTER_API_KEY`; not used by the default offline suite for that reason. |
 
 This lines up with upstream's own Cognee spike
 (`spikes/cognee-retrieval-quality/VERDICT.md`): **GO**, 100% top-3 / 85% top-1
-accuracy — via the same `cognify()` + `search(CHUNKS)` mechanism, not the raw
-graph engine. Their spike measured retrieval quality with vector search
-directly; this slice's retrieval mechanic is different (one LLM call resolves
-the whole tree path at once, per the PRD), so `CogneeDocumentStore` is used
-purely as a working *store*, with `read_tree()` returning the full tree for the
-single-call resolver — not per-query vector ranking.
+accuracy — over the same vector-store embedding space `recall()` reads from.
+Their spike measured retrieval quality with vector search directly; this slice's
+retrieval mechanic is different (one LLM call resolves the whole tree path at
+once, per the PRD), so `CogneeMemoryStore` is used purely as a working *store*,
+with `read_tree()` returning the full tree for the single-call resolver — not
+per-query vector ranking.
 
 ## Fixtures
 

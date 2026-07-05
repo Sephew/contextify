@@ -32,6 +32,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import uuid
 from abc import ABC, abstractmethod
 
 from ..llm import DEFAULT_MODEL
@@ -185,6 +186,7 @@ class CogneeMemoryStore(FrameworkStore):
                 "applicability_condition": f.applicability_condition,
                 "status": f.status.value,
                 "confidence": f.confidence,
+                "validated_successes": f.validated_successes,
             }
         )
 
@@ -199,6 +201,7 @@ class CogneeMemoryStore(FrameworkStore):
             applicability_condition=list(data.get("applicability_condition", [])),
             status=FrameworkStatus(data.get("status", "seeded")),
             confidence=float(data.get("confidence", 1.0)),
+            validated_successes=int(data.get("validated_successes", 0)),
         )
 
     async def seed(self, frameworks: list[Framework]) -> None:
@@ -271,3 +274,78 @@ class CogneeMemoryStore(FrameworkStore):
             seen.add(framework.id)
             tree.append(framework)
         return tree
+
+    async def set_confidence(self, framework_id: str, confidence: float) -> None:
+        def _apply(f: Framework) -> None:
+            f.confidence = confidence
+
+        await self._update(framework_id, _apply)
+
+    async def set_status(self, framework_id: str, status: FrameworkStatus) -> None:
+        def _apply(f: Framework) -> None:
+            f.status = status
+
+        await self._update(framework_id, _apply)
+
+    async def increment_validated_successes(self, framework_id: str) -> int:
+        def _apply(f: Framework) -> int:
+            f.validated_successes += 1
+            return f.validated_successes
+
+        return await self._update(framework_id, _apply)
+
+    async def _update(self, framework_id: str, apply):
+        """Read-modify-write a single Framework: recall its current document,
+        apply the mutation, delete the old chunk(s), then re-remember() the
+        updated document under the same node_set.
+
+        Delete-then-remember (not a bare re-remember): remember() *appends* a new
+        chunk for a node_set rather than replacing the existing one (confirmed
+        live), so without deleting the old chunk first, read_tree() could return
+        the stale copy. Deleting every data_id found for this id also self-heals
+        any prior accumulation. Raises KeyError for an unknown id, matching
+        InMemoryGraphStore."""
+        self._configure_from_openrouter()
+        import cognee
+        from cognee.modules.data.exceptions.exceptions import DatasetNotFoundError
+        from cognee.modules.search.types import SearchType
+
+        try:
+            results = await cognee.recall(
+                query_text="software debugging and testing framework applicability",
+                query_type=SearchType.CHUNKS,
+                datasets=[self.DATASET],
+                node_name=[framework_id],
+                top_k=self._READ_TOP_K,
+            )
+        except DatasetNotFoundError:
+            results = []
+
+        current: Framework | None = None
+        stale_data_ids: list[str] = []
+        for entry in results:
+            text = getattr(entry, "text", None)
+            if not text:
+                continue
+            try:
+                framework = self._from_document(text)
+            except (KeyError, ValueError, json.JSONDecodeError):
+                continue
+            if framework.id != framework_id:
+                continue
+            if current is None:
+                current = framework
+            data_id = (getattr(entry, "metadata", None) or {}).get("data_id")
+            if data_id:
+                stale_data_ids.append(str(data_id))
+
+        if current is None:
+            raise KeyError(f"unknown framework id {framework_id!r}")
+
+        result = apply(current)
+        for data_id in stale_data_ids:
+            await cognee.forget(data_id=uuid.UUID(data_id), dataset=self.DATASET)
+        await cognee.remember(
+            self._to_document(current), dataset_name=self.DATASET, node_set=[current.id]
+        )
+        return result

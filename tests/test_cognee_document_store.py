@@ -14,6 +14,7 @@ import pytest
 from dotenv import load_dotenv
 
 from contextify.framework_store import DEBUGGING_FRAMEWORKS, CogneeMemoryStore
+from contextify.models import FrameworkStatus
 
 load_dotenv()
 
@@ -52,3 +53,32 @@ async def test_cognee_memory_store_get_reads_a_single_node():
     assert len(got.applicability_condition) > 0
 
     assert await store.get("fw.does_not_exist") is None
+
+
+@pytest.mark.asyncio
+async def test_cognee_memory_store_write_back_persists():
+    store = CogneeMemoryStore()
+    await store.seed(DEBUGGING_FRAMEWORKS)
+
+    await store.set_confidence("fw.bisection", 0.42)
+    got = await store.get("fw.bisection")
+    assert got is not None and got.confidence == 0.42
+
+    await store.set_status("fw.bisection", FrameworkStatus.PROVISIONAL)
+    got = await store.get("fw.bisection")
+    assert got is not None and got.status is FrameworkStatus.PROVISIONAL
+    # the earlier confidence write-back survived the status write-back
+    assert got.confidence == 0.42
+
+    n1 = await store.increment_validated_successes("fw.bisection")
+    n2 = await store.increment_validated_successes("fw.bisection")
+    assert (n1, n2) == (1, 2)
+    got = await store.get("fw.bisection")
+    assert got is not None and got.validated_successes == 2
+
+    # write-back replaces rather than accumulates: still exactly the seeded set
+    tree = await store.read_tree()
+    assert {f.id for f in tree} == {f.id for f in DEBUGGING_FRAMEWORKS}
+
+    with pytest.raises(KeyError):
+        await store.set_confidence("fw.does_not_exist", 0.1)
