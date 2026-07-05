@@ -83,6 +83,11 @@ class FrameworkStore(ABC):
             f"{type(self).__name__} does not support validated-success tracking"
         )
 
+    async def delete(self, framework_id: str) -> None:
+        """Remove a Framework node. Default: unsupported; override where the
+        backend can actually delete (see InMemoryGraphStore)."""
+        raise NotImplementedError(f"{type(self).__name__} does not support delete")
+
 
 class InMemoryGraphStore(FrameworkStore):
     """A real graph (nodes + parent/child adjacency), no external backend needed."""
@@ -129,6 +134,22 @@ class InMemoryGraphStore(FrameworkStore):
 
     async def roots(self) -> list[Framework]:
         return [f for f in self._nodes.values() if f.parent is None]
+
+    async def delete(self, framework_id: str) -> None:
+        node = self._nodes.get(framework_id)
+        if node is None:
+            raise KeyError(f"unknown framework id {framework_id!r}")
+        if node.parent is None:
+            raise ValueError(f"cannot delete branch root {framework_id!r}")
+        if self._children.get(framework_id):
+            raise ValueError(
+                f"cannot delete {framework_id!r}: it has child frameworks"
+            )
+        del self._nodes[framework_id]
+        siblings = self._children.get(node.parent)
+        if siblings and framework_id in siblings:
+            siblings.remove(framework_id)
+        self._children.pop(framework_id, None)
 
 
 class CogneeMemoryStore(FrameworkStore):
@@ -349,3 +370,40 @@ class CogneeMemoryStore(FrameworkStore):
             self._to_document(current), dataset_name=self.DATASET, node_set=[current.id]
         )
         return result
+
+    async def delete(self, framework_id: str) -> None:
+        """Remove every chunk stored under this framework's node_set. Root/
+        has-children guards mirror InMemoryGraphStore's, computed from a
+        read_tree() scan since Cognee has no native parent-child edge query."""
+        current = await self.get(framework_id)
+        if current is None:
+            raise KeyError(f"unknown framework id {framework_id!r}")
+        if current.parent is None:
+            raise ValueError(f"cannot delete branch root {framework_id!r}")
+
+        tree = await self.read_tree()
+        if any(f.parent == framework_id for f in tree):
+            raise ValueError(
+                f"cannot delete {framework_id!r}: it has child frameworks"
+            )
+
+        self._configure_from_openrouter()
+        import cognee
+        from cognee.modules.data.exceptions.exceptions import DatasetNotFoundError
+        from cognee.modules.search.types import SearchType
+
+        try:
+            results = await cognee.recall(
+                query_text="software debugging and testing framework applicability",
+                query_type=SearchType.CHUNKS,
+                datasets=[self.DATASET],
+                node_name=[framework_id],
+                top_k=self._READ_TOP_K,
+            )
+        except DatasetNotFoundError:
+            results = []
+
+        for entry in results:
+            data_id = (getattr(entry, "metadata", None) or {}).get("data_id")
+            if data_id:
+                await cognee.forget(data_id=uuid.UUID(str(data_id)), dataset=self.DATASET)

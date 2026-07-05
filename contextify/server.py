@@ -92,6 +92,7 @@ def _framework_to_dict(f: Framework) -> dict:
         "parent": f.parent,
         "status": f.status.value,
         "confidence": f.confidence,
+        "validated_successes": f.validated_successes,
         "applicability_condition": f.applicability_condition,
     }
 
@@ -194,6 +195,18 @@ async def add_framework(req: NewFrameworkRequest) -> dict:
     )
     await store.seed([framework])
     return _framework_to_dict(framework)
+
+
+@app.delete("/frameworks/{framework_id}", dependencies=[Depends(_require_api_key)])
+async def delete_framework(framework_id: str) -> dict:
+    store = await _get_default_store()
+    try:
+        await store.delete(framework_id)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"deleted": framework_id}
 
 
 _DEMO_TEMPLATE = Path(__file__).parent / "templates" / "demo.html"

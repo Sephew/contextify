@@ -68,14 +68,36 @@
   .tree { display: flex; flex-direction: column; gap: 0.4rem; }
   .branch-group { margin-bottom: 0.75rem; }
   .branch-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 0.4rem; }
+  .fw-item {
+    background: #1e293b; border: 1px solid #334155; border-radius: 6px;
+    font-size: 0.85rem; overflow: hidden;
+  }
+  .fw-item + .fw-item { margin-top: 0.35rem; }
   .fw-row {
     display: flex; justify-content: space-between; align-items: center;
-    background: #1e293b; border: 1px solid #334155; border-radius: 6px;
-    padding: 0.5rem 0.75rem; font-size: 0.85rem;
+    padding: 0.5rem 0.75rem; cursor: pointer; user-select: none;
   }
-  .fw-row + .fw-row { margin-top: 0.35rem; }
+  .fw-row:hover { background: #24324a; }
   .fw-row .name { font-weight: 500; }
+  .fw-row .name .chevron { display: inline-block; margin-right: 0.4rem; color: #64748b; transition: transform 0.15s; font-size: 0.7rem; }
+  .fw-item.open .fw-row .name .chevron { transform: rotate(90deg); }
   .fw-row .conf { color: #64748b; font-size: 0.75rem; }
+  .fw-detail {
+    display: none; padding: 0 0.75rem 0.75rem 1.7rem; font-size: 0.8rem; color: #94a3b8;
+    border-top: 1px solid #334155;
+  }
+  .fw-item.open .fw-detail { display: block; }
+  .fw-detail dl { margin: 0.5rem 0; }
+  .fw-detail dt { color: #64748b; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; margin-top: 0.5rem; }
+  .fw-detail dd { margin: 0.15rem 0 0; color: #cbd5e1; }
+  .fw-detail ul { margin: 0.15rem 0 0; padding-left: 1.1rem; }
+  .fw-detail li { margin-bottom: 0.2rem; }
+  .fw-delete {
+    background: transparent; border: 1px solid #7f1d1d; color: #fca5a5;
+    font-size: 0.7rem; padding: 0.2rem 0.55rem; border-radius: 6px; margin-top: 0.6rem;
+  }
+  .fw-delete:hover { background: #7f1d1d; color: #fecaca; }
+  .fw-root-note { color: #475569; font-style: italic; }
   #guide-panel, #addfw-panel {
     display: none; margin-top: 1rem; background: #1e293b; border: 1px solid #334155;
     border-radius: 8px; padding: 1rem 1.25rem;
@@ -174,6 +196,34 @@ async function apiPost(path, body) {
 }
 
 // --- Frameworks list ---------------------------------------------------
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderFrameworkRow(f) {
+  const conditions = (f.applicability_condition || [])
+    .map(c => `<li>${escapeHtml(c)}</li>`).join('') || '<li class="fw-root-note">none recorded</li>';
+  return `
+    <div class="fw-item" data-id="${f.id}">
+      <div class="fw-row" data-toggle="${f.id}">
+        <span class="name"><span class="chevron">▶</span>${f.name}</span>
+        <span>
+          <span class="conf">conf ${f.confidence.toFixed(2)}</span>
+          <span class="badge ${f.status}">${f.status}</span>
+        </span>
+      </div>
+      <div class="fw-detail">
+        <dl>
+          <dt>id</dt><dd>${f.id}</dd>
+          <dt>parent</dt><dd>${f.parent || '(branch root)'}</dd>
+          <dt>validated successes</dt><dd>${f.validated_successes} ${f.status === 'provisional' ? '(promotes to trusted at 3)' : ''}</dd>
+          <dt>applicability condition</dt><dd><ul>${conditions}</ul></dd>
+        </dl>
+        ${f.parent !== null ? `<button class="fw-delete" data-delete="${f.id}">Delete framework</button>` : '<div class="fw-root-note">branch roots can\'t be deleted</div>'}
+      </div>
+    </div>`;
+}
+
 async function loadFrameworks() {
   const treeEl = document.getElementById('frameworks-tree');
   try {
@@ -185,19 +235,43 @@ async function loadFrameworks() {
     treeEl.innerHTML = Object.entries(branches).map(([branch, items]) => `
       <div class="branch-group">
         <div class="branch-title">${branch}</div>
-        ${items.filter(f => f.parent !== null).map(f => `
-          <div class="fw-row">
-            <span class="name">${f.name}</span>
-            <span>
-              <span class="conf">conf ${f.confidence.toFixed(2)}</span>
-              <span class="badge ${f.status}">${f.status}</span>
-            </span>
-          </div>`).join('')}
+        ${items.filter(f => f.parent !== null).map(renderFrameworkRow).join('')}
       </div>`).join('');
     populateParentSelect(frameworks);
+    wireFrameworkRows();
   } catch (e) {
     treeEl.innerHTML = `<div class="error">Could not load frameworks: ${e}</div>`;
   }
+}
+
+function wireFrameworkRows() {
+  document.querySelectorAll('[data-toggle]').forEach(row => {
+    row.addEventListener('click', () => {
+      row.closest('.fw-item').classList.toggle('open');
+    });
+  });
+  document.querySelectorAll('[data-delete]').forEach(btn => {
+    btn.addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      const id = btn.dataset.delete;
+      if (!confirm(`Delete framework "${id}"? This can't be undone.`)) return;
+      btn.disabled = true;
+      btn.textContent = 'Deleting...';
+      try {
+        await fetch(`${BASE}/frameworks/${encodeURIComponent(id)}`, {
+          method: 'DELETE', headers: { 'X-API-Key': API_KEY }
+        }).then(async res => {
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.detail || res.status);
+        });
+        loadFrameworks();
+      } catch (e) {
+        alert(`Could not delete: ${e}`);
+        btn.disabled = false;
+        btn.textContent = 'Delete framework';
+      }
+    });
+  });
 }
 
 function populateParentSelect(frameworks) {
