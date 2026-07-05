@@ -1,14 +1,15 @@
-"""The hand-authored Debugging seed set (v1).
+"""The hand-authored seed set (v1): Debugging and Testing branches.
 
 Per the PRD, the store starts from a small human-authored taxonomy (cold start),
-not frameworks invented from nothing. This slice seeds the **Debugging** branch
-only: one branch root plus four leaf frameworks.
+not frameworks invented from nothing. Two sibling branch roots, each with a
+handful of leaf frameworks.
 
 Each leaf's ``applicability_condition`` is a checklist tested *structurally*
 against a :class:`~contextify.models.ProblemAbstraction`. The checklist lines
 deliberately embed the schema's own vocabulary (the enum values such as
-``deterministic``, ``failing_test``, ``root_cause``) so a matcher can test the
-abstraction against them token-for-token rather than by fuzzy similarity.
+``deterministic``, ``failing_test``, ``root_cause``, ``coverage_increase``) so a
+matcher can test the abstraction against them token-for-token rather than by
+fuzzy similarity.
 """
 
 from __future__ import annotations
@@ -100,3 +101,75 @@ DEBUGGING_FRAMEWORKS: list[Framework] = [
     CACHE_CHECKLIST,
     TRACE_INSTRUMENTATION,
 ]
+
+# Testing branch (v1) --------------------------------------------------------- #
+# Sibling to Debugging: same tree shape (one root, leaves tested structurally
+# against the abstraction), seeded so retrieval can choose between the two
+# branches within a single LLM call rather than only ever resolving Debugging.
+TESTING_ROOT = Framework(
+    id="fw.testing",
+    name="Testing",
+    branch=Branch.TESTING,
+    parent=None,
+    applicability_condition=["branch root: any test-design or test-coverage problem"],
+    status=FrameworkStatus.SEEDED,
+)
+
+BOUNDARY_VALUE = Framework(
+    id="fw.boundary_value",
+    name="Boundary Value Analysis",
+    branch=Branch.TESTING,
+    parent="fw.testing",
+    applicability_condition=[
+        "input_shape: a numeric or ordered range with a known minimum and/or maximum "
+        "bound (an age limit, a byte size limit, a price cap)",
+        "the concern is the exact edge values (off-by-one) at the boundary of a "
+        "single numeric range, not a choice between separate inputs handled by "
+        "different logic",
+        "goal_shape: coverage_increase — cover the minimum, the maximum, and the "
+        "values just inside/just outside those limits",
+    ],
+    status=FrameworkStatus.SEEDED,
+)
+
+EQUIVALENCE_PARTITIONING = Framework(
+    id="fw.equivalence_partitioning",
+    name="Equivalence Partitioning",
+    branch=Branch.TESTING,
+    parent="fw.testing",
+    applicability_condition=[
+        "input_shape: input splits into distinct categories or classes, each handled "
+        "by a different code path (account types, payment methods, address types, "
+        "auth providers)",
+        "the concern is category coverage — one representative case per class — not "
+        "edge values within a single range",
+        "goal_shape: coverage_increase — one representative test per distinct input "
+        "category",
+    ],
+    status=FrameworkStatus.SEEDED,
+)
+
+STATE_TRANSITION = Framework(
+    id="fw.state_transition",
+    name="State Transition Testing",
+    branch=Branch.TESTING,
+    parent="fw.testing",
+    applicability_condition=[
+        "input_shape: correctness depends on the order or sequence of actions/events "
+        "over time, not just individual input values in isolation",
+        "the concern is specific action sequences (especially unlikely-but-reachable "
+        "ones), modeled as states and transitions between them",
+        "goal_shape: coverage_increase — test specific sequences/transitions between "
+        "states",
+    ],
+    status=FrameworkStatus.SEEDED,
+)
+
+TESTING_FRAMEWORKS: list[Framework] = [
+    TESTING_ROOT,
+    BOUNDARY_VALUE,
+    EQUIVALENCE_PARTITIONING,
+    STATE_TRANSITION,
+]
+
+ALL_FRAMEWORKS: list[Framework] = [*DEBUGGING_FRAMEWORKS, *TESTING_FRAMEWORKS]

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .seed import DEBUGGING_FRAMEWORKS
+from .seed import ALL_FRAMEWORKS, DEBUGGING_FRAMEWORKS, TESTING_FRAMEWORKS
 from .store import (
     CogneeDocumentStore,
     CogneeFrameworkStore,
@@ -12,9 +12,9 @@ from .store import (
 
 
 async def build_seeded_store(store: FrameworkStore | None = None) -> FrameworkStore:
-    """Return a store seeded with the Debugging branch. Defaults to in-memory."""
+    """Return a store seeded with both branches. Defaults to in-memory."""
     store = store if store is not None else InMemoryGraphStore()
-    await store.seed(DEBUGGING_FRAMEWORKS)
+    await store.seed(ALL_FRAMEWORKS)
     return store
 
 
@@ -24,5 +24,7 @@ __all__ = [
     "CogneeFrameworkStore",
     "CogneeDocumentStore",
     "DEBUGGING_FRAMEWORKS",
+    "TESTING_FRAMEWORKS",
+    "ALL_FRAMEWORKS",
     "build_seeded_store",
 ]

@@ -38,4 +38,5 @@ def resolve(
         confidence=decision.confidence,
         abstraction=abstraction,
         rationale=decision.rationale,
+        low_confidence=decision.ambiguous,
     )

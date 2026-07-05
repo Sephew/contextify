@@ -6,19 +6,21 @@ from contextify.models import FrameworkStatus
 
 
 @pytest.mark.asyncio
-async def test_seeded_store_contains_root_and_four_leaves():
+async def test_seeded_store_contains_both_branch_roots_and_all_leaves():
     store = await build_seeded_store()
     tree = await store.read_tree()
-    assert len(tree) == 5  # 1 root + 4 leaves
+    assert len(tree) == 9  # 2 roots (debugging + testing) + 4 + 3 leaves
 
-    root = await store.get("fw.debugging")
-    assert root is not None
-    assert root.is_root
+    debugging_root = await store.get("fw.debugging")
+    testing_root = await store.get("fw.testing")
+    assert debugging_root is not None and debugging_root.is_root
+    assert testing_root is not None and testing_root.is_root
 
-    leaves = [f for f in tree if not f.is_root]
-    assert len(leaves) == 4
-    for leaf in leaves:
-        assert leaf.parent == "fw.debugging"
+    debugging_leaves = [f for f in tree if f.parent == "fw.debugging"]
+    testing_leaves = [f for f in tree if f.parent == "fw.testing"]
+    assert len(debugging_leaves) == 4
+    assert len(testing_leaves) == 3
+    for leaf in [*debugging_leaves, *testing_leaves]:
         assert len(leaf.applicability_condition) > 0
         assert leaf.status == FrameworkStatus.SEEDED
 

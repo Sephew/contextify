@@ -1,18 +1,21 @@
-"""Debugging-relevant cases from Slice 01's fixture set, ported.
+"""Full 20-case adversarial fixture set from Slice 0, ported.
 
-Issue 02 acceptance criterion: "At least the Debugging-relevant cases from
-Slice 01's fixture set pass as automated tests." Slice 01's fixture set is
+Slice 2 acceptance criterion: "Slice 0's full adversarial fixture set (false
+friends + disguised twins across both branches) runs as an automated
+regression suite and passes." Slice 0's fixture set is
 ``spikes/cognee-retrieval-quality/fixtures.py`` (20 cases spanning Debugging +
-Testing); this ports its 12 Debugging-branch cases and runs each raw_text
-through this package's actual retrieve_framework() seam (not Cognee vector
-search, which is how the spike itself measured retrieval — this slice's
-mechanism is a single LLM call over the whole tree, per the PRD).
+Testing); this ports all 20 cases and runs each raw_text through this
+package's actual retrieve_framework() seam (not Cognee vector search, which is
+how the spike itself measured retrieval — this slice's mechanism is a single
+LLM call over the whole tree, per the PRD).
 
 correct_framework values in the spike use flat snake_case ids
-(binary_search_bisection, differential_diagnosis, cache_invalidation_checklist)
+(binary_search_bisection, differential_diagnosis, cache_invalidation_checklist,
+boundary_value_analysis, equivalence_partitioning, state_transition_testing)
 that don't exist in this package's tree (contextify/framework_store/seed.py
-uses fw.bisection / fw.differential / fw.cache_invalidation); _ID_MAP bridges
-the two naming schemes rather than renaming either side.
+uses fw.bisection / fw.differential / fw.cache_invalidation / fw.boundary_value
+/ fw.equivalence_partitioning / fw.state_transition); _ID_MAP bridges the two
+naming schemes rather than renaming either side.
 """
 
 from __future__ import annotations
@@ -28,11 +31,13 @@ _ID_MAP = {
     "binary_search_bisection": "fw.bisection",
     "differential_diagnosis": "fw.differential",
     "cache_invalidation_checklist": "fw.cache_invalidation",
+    "boundary_value_analysis": "fw.boundary_value",
+    "equivalence_partitioning": "fw.equivalence_partitioning",
+    "state_transition_testing": "fw.state_transition",
 }
 
 # The 12 Debugging-branch cases from spikes/cognee-retrieval-quality/fixtures.py
-# (ff1-a/b, ff2-a/b, ff5-a/b, dt1-a/b, dt2-a/b, dt3-a/b). Testing-branch cases
-# (ff3/ff4/dt4/dt5) are out of scope for this Debugging-only slice.
+# (ff1-a/b, ff2-a/b, ff5-a/b, dt1-a/b, dt2-a/b, dt3-a/b).
 UPSTREAM_DEBUGGING_CASES = [
     {
         "id": "ff1-a",
@@ -135,12 +140,87 @@ UPSTREAM_DEBUGGING_CASES = [
     },
 ]
 
+# The 8 Testing-branch cases from spikes/cognee-retrieval-quality/fixtures.py
+# (ff3-a/b, ff4-a/b, dt4-a/b, dt5-a/b). Added in Slice 2 alongside the Testing
+# branch itself.
+UPSTREAM_TESTING_CASES = [
+    {
+        "id": "ff3-a",
+        "raw_text": (
+            "We want to make sure the discount calculator handles cart totals of exactly "
+            "$0, exactly the max allowed $10,000, and one cent over the max."
+        ),
+        "correct_framework": "boundary_value_analysis",
+    },
+    {
+        "id": "ff3-b",
+        "raw_text": (
+            "We want to make sure the discount calculator is tested for gift-card "
+            "totals, credit-card totals, and store-credit totals, since they follow "
+            "different rounding rules."
+        ),
+        "correct_framework": "equivalence_partitioning",
+    },
+    {
+        "id": "ff4-a",
+        "raw_text": (
+            "We suspect there's a bug that only appears if a user pauses a video, seeks "
+            "backward, then pauses again before it buffers — want tests covering these "
+            "action sequences."
+        ),
+        "correct_framework": "state_transition_testing",
+    },
+    {
+        "id": "ff4-b",
+        "raw_text": (
+            "We want test coverage for pausing videos across our three player types: "
+            "HTML5, native iOS, and Chromecast, since each may behave differently."
+        ),
+        "correct_framework": "equivalence_partitioning",
+    },
+    {
+        "id": "dt4-a",
+        "raw_text": (
+            "Want to verify the age-verification form correctly handles someone entering "
+            "exactly 18, 17, and 19 years old."
+        ),
+        "correct_framework": "boundary_value_analysis",
+    },
+    {
+        "id": "dt4-b",
+        "raw_text": (
+            "Need to check the file-upload feature at exactly 0 bytes, exactly the 25MB "
+            "limit, and 25MB-plus-one-byte."
+        ),
+        "correct_framework": "boundary_value_analysis",
+    },
+    {
+        "id": "dt5-a",
+        "raw_text": (
+            "We should test the shipping-cost function against domestic addresses, "
+            "international addresses, and PO boxes, since each takes a different code "
+            "path."
+        ),
+        "correct_framework": "equivalence_partitioning",
+    },
+    {
+        "id": "dt5-b",
+        "raw_text": (
+            "We should verify the login flow works for email accounts, Google SSO "
+            "accounts, and SAML accounts, since they're handled by different providers."
+        ),
+        "correct_framework": "equivalence_partitioning",
+    },
+]
+
+UPSTREAM_ALL_CASES = UPSTREAM_DEBUGGING_CASES + UPSTREAM_TESTING_CASES
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "case", UPSTREAM_DEBUGGING_CASES, ids=[c["id"] for c in UPSTREAM_DEBUGGING_CASES]
+    "case", UPSTREAM_ALL_CASES, ids=[c["id"] for c in UPSTREAM_ALL_CASES]
 )
-async def test_upstream_debugging_fixture_resolves_correctly(case):
+async def test_upstream_fixture_resolves_correctly(case):
     llm = MockLLMClient()
     store = await build_seeded_store()
     tree = await store.read_tree()

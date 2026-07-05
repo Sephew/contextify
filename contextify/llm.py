@@ -39,6 +39,9 @@ class LLMRetrievalDecision:
     path: list[str]
     confidence: float
     rationale: str
+    # Leading misfit signal: True when the top candidates were ambiguously close,
+    # so the caller should treat this as a flagged guess, not a confident pick.
+    ambiguous: bool = False
 
 
 class LLMClient(Protocol):
@@ -94,7 +97,9 @@ def _retrieval_prompt(abstraction: ProblemAbstraction, tree: list[Framework]) ->
         "testing the abstraction against each node's applicability checklist. "
         "Output ONLY JSON:\n"
         '{"chosen_id": "<leaf id>", "path": ["<root name>", ..., "<leaf name>"], '
-        '"confidence": <0.0-1.0>, "rationale": "<one sentence>"}'
+        '"confidence": <0.0-1.0>, "rationale": "<one sentence>", '
+        '"ambiguous": <true if the top two candidate leaves fit almost equally '
+        "well and no single leaf clearly dominates, false otherwise>}"
     )
 
 
@@ -179,6 +184,7 @@ class OpenRouterClient:
             path=[str(p) for p in data["path"]],
             confidence=float(data["confidence"]),
             rationale=str(data.get("rationale", "")),
+            ambiguous=bool(data.get("ambiguous", False)),
         )
 
 
@@ -233,11 +239,39 @@ _SELF_RESOLVING_MARKERS = (
     "delay", "log out", "log back in", "relogin",
 )
 
+# Testing-branch structural bonus signals, mirroring the self-resolving bonus
+# above: short/common phrasing that a rare-word symptom-overlap tiebreaker alone
+# wouldn't catch, but that's a genuine signal for which Testing leaf applies.
+_BOUNDARY_HINTS = (
+    "exactly", "minimum", "maximum", "one cent over", "one byte", "off-by-one",
+    "just inside", "just outside", "the limit", "the max", "the min",
+)
+_BOUNDARY_MARKERS = ("boundary", "edge", "minimum", "maximum")
+
+_CATEGORY_HINTS = (
+    "different", "distinct", "each takes a different", "different code path",
+    "different providers", "different rounding rules", "since each",
+    "categories", "types:",
+)
+_CATEGORY_MARKERS = ("categor", "class", "representative", "code path")
+
+_SEQUENCE_HINTS = (
+    "seeks backward", "pauses again", "sequence of actions", "before it buffers",
+    "order of actions", "specific sequence",
+)
+_SEQUENCE_MARKERS = ("sequence", "state", "transition", "order")
+
+# Ambiguously-close top candidates: a real match (best_score > 0) whose
+# runner-up is within this many points is flagged low-confidence rather than
+# silently guessed.
+_AMBIGUITY_MARGIN = 1
+
 _GOAL_RULES = [
     (GoalShape.REGRESSION_PREVENTION, ("prevent regression", "stop it recurring",
                                        "regression test", "make sure it never")),
     (GoalShape.COVERAGE_INCREASE, ("coverage", "untested", "add tests",
-                                   "test the")),
+                                   "test the", "verify", "want to make sure",
+                                   "want tests", "need to check")),
     (GoalShape.FIX, ("fix it", "fixed", "make it work", "resolve", "patch",
                      "correct the", "propagate correctly", "need it to",
                      "need this fixed")),
@@ -345,11 +379,18 @@ class MockLLMClient:
         runner_up = scored[1][0] if len(scored) > 1 else 0.0
         margin = best_score - runner_up
         confidence = round(min(1.0, 0.5 + 0.1 * best_score + 0.1 * margin), 3)
+        # Leading misfit signal: a real match (best_score > 0) whose runner-up
+        # scored almost as well is an ambiguous guess, not a confident pick.
+        ambiguous = len(scored) > 1 and best_score > 0 and margin <= _AMBIGUITY_MARGIN
+        rationale = f"best applicability overlap (score {best_score}) among leaves"
+        if ambiguous:
+            rationale += f"; runner-up scored {runner_up} — ambiguously close"
         return LLMRetrievalDecision(
             chosen_id=best.id,
             path=path,
             confidence=confidence,
-            rationale=f"best applicability overlap (score {best_score}) among leaves",
+            rationale=rationale,
+            ambiguous=ambiguous,
         )
 
     @staticmethod
@@ -385,6 +426,21 @@ class MockLLMClient:
         # common words the word-overlap tiebreaker above (>=6 chars) can't see.
         if any(hint in symptom_lower for hint in _SELF_RESOLVING_HINTS) and any(
             marker in blob for marker in _SELF_RESOLVING_MARKERS
+        ):
+            score += 4
+        # Same pattern for the Testing branch: short/common phrasing that names
+        # the shape of the input (a range edge, a set of categories, an action
+        # sequence) rather than restating the checklist's own rarer vocabulary.
+        if any(hint in symptom_lower for hint in _BOUNDARY_HINTS) and any(
+            marker in blob for marker in _BOUNDARY_MARKERS
+        ):
+            score += 4
+        if any(hint in symptom_lower for hint in _CATEGORY_HINTS) and any(
+            marker in blob for marker in _CATEGORY_MARKERS
+        ):
+            score += 4
+        if any(hint in symptom_lower for hint in _SEQUENCE_HINTS) and any(
+            marker in blob for marker in _SEQUENCE_MARKERS
         ):
             score += 4
         return score

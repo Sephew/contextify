@@ -107,6 +107,10 @@ class FrameworkMatch:
     confidence: float
     abstraction: ProblemAbstraction
     rationale: str = ""
+    # Leading misfit signal: True when the top candidates scored ambiguously
+    # close together, so this match should be treated as a flagged guess rather
+    # than a confident pick.
+    low_confidence: bool = False
 
     @property
     def framework_name(self) -> str:
