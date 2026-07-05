@@ -1,10 +1,11 @@
 # Contextify
 
 A Framework Retrieval System: retrieve the right *way of thinking* about a
-problem (a reasoning framework), not similar facts. Slices 1-3 are built:
+problem (a reasoning framework), not similar facts. Slices 1-4 are built:
 both the **Debugging** and **Testing** branches, single-call branch+leaf
-resolution with a leading misfit signal, and the `reflect()` write-back seam
-(ground truth, confidence updates, lagging misfit, tree-distance severity).
+resolution with a leading misfit signal, the `reflect()` write-back seam
+(ground truth, confidence updates, lagging misfit, tree-distance severity),
+and a human-in-the-loop promotion gate for new provisional frameworks.
 
 Full design context: [`.scratch/framework-retrieval-system/PRD.md`](.scratch/framework-retrieval-system/PRD.md),
 [`framework-retrieval-system.md`](framework-retrieval-system.md), glossary in
@@ -54,7 +55,16 @@ network/LLM/embedding calls); it self-skips unless `OPENROUTER_API_KEY` is set.
   branch-specific ground truth (Debugging: repro pass/fail; Testing: mutation
   caught / coverage delta), strengthens/weakens the matched Framework's
   confidence, and detects the lagging misfit signal (3+ distinct Frameworks
-  tried for the same problem) with tree-distance severity.
+  tried for the same problem) with tree-distance severity. A successful
+  reflection against a `provisional` framework also counts toward its
+  promotion (see below).
+- `framework_store/promotion.py` — the human-in-the-loop promotion gate: new
+  frameworks enter via `new_provisional_framework(...)` at reduced confidence
+  (`status=PROVISIONAL`); they're still eligible for retrieval (just weighted
+  lower — `resolve()` scales match confidence by the framework's own
+  confidence), and get promoted to trusted/seeded weight via
+  `promote_framework(...)` either automatically after 3 validated successful
+  reflections or by explicit human sign-off.
 - `api.py` — the two public seams: `retrieve_framework()` and `reflect()`,
   both built, with async (`aretrieve_framework`/`areflect`) and sync facades.
 
@@ -88,11 +98,11 @@ this slice's retrieval mechanism is a single LLM call over the whole tree).
 `tests/fixtures.py` holds additional hand-authored adversarial cases (false
 friends / disguised twins). `tests/test_misfit.py` and `tests/test_reflect.py`
 cover the leading/lagging misfit signals and the reflection write-back
-respectively.
+respectively; `tests/test_promotion.py` covers the provisional → trusted
+promotion gate.
 
 ## Known gaps (out of scope so far)
 
-- Human-in-the-loop promotion gate for provisional frameworks (Slice 4).
 - Path caching for repeated/similar problem schemas (Slice 5).
 - The 4-field abstraction schema is a first-cut hypothesis (per the PRD), not a
   fully solved classifier — `MockLLMClient`'s heuristic needed several rounds of

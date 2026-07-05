@@ -1,6 +1,6 @@
 # Slice 4 — Human-in-the-loop promotion gate
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 
