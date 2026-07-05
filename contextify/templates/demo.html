@@ -129,6 +129,12 @@
 
     <div>GET /frameworks (list the current tree)</div>
     <pre class="curl" id="curl-frameworks"></pre>
+
+    <div>POST /frameworks (add a new provisional framework)</div>
+    <pre class="curl" id="curl-frameworks-create"></pre>
+
+    <div>DELETE /frameworks/{id} (remove a framework — branch roots and frameworks with children are rejected)</div>
+    <pre class="curl" id="curl-frameworks-delete"></pre>
   </div>
 
   <section>
@@ -361,6 +367,14 @@ document.getElementById('guide-btn').addEventListener('click', () => {
   -d '{"match_id": "<match_id from /retrieve>", "outcome": "repro_now_passes"}'`;
     document.getElementById('curl-frameworks').textContent =
 `curl ${BASE}/frameworks -H "X-API-Key: ${API_KEY}"`;
+    document.getElementById('curl-frameworks-create').textContent =
+`curl -X POST ${BASE}/frameworks \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: ${API_KEY}" \\
+  -d '{"name": "Rubber Duck Debugging", "branch": "debugging", "parent": "fw.debugging", "applicability_condition": ["goal_shape: root_cause"]}'`;
+    document.getElementById('curl-frameworks-delete').textContent =
+`curl -X DELETE ${BASE}/frameworks/fw.rubber_duck_debugging \\
+  -H "X-API-Key: ${API_KEY}"`;
   }
 });
 
