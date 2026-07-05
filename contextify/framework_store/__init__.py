@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+from .promotion import (
+    PROMOTED_CONFIDENCE_FLOOR,
+    PROMOTION_THRESHOLD,
+    PROVISIONAL_DEFAULT_CONFIDENCE,
+    new_provisional_framework,
+    promote_framework,
+)
 from .seed import ALL_FRAMEWORKS, DEBUGGING_FRAMEWORKS, TESTING_FRAMEWORKS
 from .store import (
     CogneeDocumentStore,
@@ -27,4 +34,9 @@ __all__ = [
     "TESTING_FRAMEWORKS",
     "ALL_FRAMEWORKS",
     "build_seeded_store",
+    "new_provisional_framework",
+    "promote_framework",
+    "PROVISIONAL_DEFAULT_CONFIDENCE",
+    "PROMOTED_CONFIDENCE_FLOOR",
+    "PROMOTION_THRESHOLD",
 ]

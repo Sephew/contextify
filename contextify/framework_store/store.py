@@ -68,6 +68,23 @@ class FrameworkStore(ABC):
             f"{type(self).__name__} does not support confidence write-back"
         )
 
+    async def set_status(self, framework_id: str, status: FrameworkStatus) -> None:
+        """Update a Framework node's status in place (promotion write-back).
+        Default: unsupported; override where the backend can actually mutate
+        node state (see InMemoryGraphStore)."""
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support status write-back"
+        )
+
+    async def increment_validated_successes(self, framework_id: str) -> int:
+        """Bump a provisional Framework's validated-success counter and return
+        the new count (promotion's auto-trigger). Default: unsupported;
+        override where the backend can actually mutate node state (see
+        InMemoryGraphStore)."""
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support validated-success tracking"
+        )
+
 
 class InMemoryGraphStore(FrameworkStore):
     """A real graph (nodes + parent/child adjacency), no external backend needed."""
@@ -95,6 +112,19 @@ class InMemoryGraphStore(FrameworkStore):
         if node is None:
             raise KeyError(f"unknown framework id {framework_id!r}")
         node.confidence = confidence
+
+    async def set_status(self, framework_id: str, status: FrameworkStatus) -> None:
+        node = self._nodes.get(framework_id)
+        if node is None:
+            raise KeyError(f"unknown framework id {framework_id!r}")
+        node.status = status
+
+    async def increment_validated_successes(self, framework_id: str) -> int:
+        node = self._nodes.get(framework_id)
+        if node is None:
+            raise KeyError(f"unknown framework id {framework_id!r}")
+        node.validated_successes += 1
+        return node.validated_successes
 
     async def children_of(self, framework_id: str | None) -> list[Framework]:
         return [self._nodes[c] for c in self._children.get(framework_id, [])]

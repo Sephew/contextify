@@ -32,10 +32,14 @@ def resolve(
             f"known ids: {sorted(by_id)}"
         )
 
+    # Provisional Frameworks are eligible for retrieval, not excluded — but
+    # scaling by the Framework's own trust weight means an equally-good
+    # structural match still reads as less confident until it's promoted
+    # (PRD user story 13).
     return FrameworkMatch(
         framework=framework,
         path=decision.path,
-        confidence=decision.confidence,
+        confidence=decision.confidence * framework.confidence,
         abstraction=abstraction,
         rationale=decision.rationale,
         low_confidence=decision.ambiguous,

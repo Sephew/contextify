@@ -13,6 +13,7 @@ Public API::
 from __future__ import annotations
 
 from .api import aretrieve_framework, areflect, reflect, retrieve_framework
+from .framework_store import new_provisional_framework, promote_framework
 from .llm import LLMClient, MockLLMClient, OpenRouterClient
 from .models import (
     Branch,
@@ -52,5 +53,7 @@ __all__ = [
     "ReflectionOutcome",
     "ReflectionResult",
     "Reproducibility",
+    "new_provisional_framework",
+    "promote_framework",
     "__version__",
 ]

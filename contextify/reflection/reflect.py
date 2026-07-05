@@ -27,12 +27,18 @@ across retries (see ``api.aretrieve_framework``), not inferred from text or
 abstraction similarity — that similarity-based grouping is Slice 5's job
 (path caching keyed on abstracted-schema similarity), a distinct concern
 deferred on purpose.
+
+Promotion gate (PRD user stories 13-14, ``framework_store/promotion.py``): a
+successful reflection against a still-``provisional`` Framework counts toward
+its auto-promotion threshold. Failing reflections never count — a Framework
+that only sometimes works hasn't earned trust yet.
 """
 
 from __future__ import annotations
 
+from ..framework_store.promotion import PROMOTION_THRESHOLD, promote_framework
 from ..framework_store.store import FrameworkStore
-from ..models import Branch, ReflectionOutcome, ReflectionResult
+from ..models import Branch, FrameworkStatus, ReflectionOutcome, ReflectionResult
 from .history import MatchHistory
 from .tree_distance import tree_distance
 
@@ -108,6 +114,14 @@ async def reflect(
     )
     await store.set_confidence(framework.id, confidence_after)
 
+    promoted = False
+    if success and framework.status == FrameworkStatus.PROVISIONAL:
+        validated_successes = await store.increment_validated_successes(framework.id)
+        if validated_successes >= PROMOTION_THRESHOLD:
+            promoted_framework = await promote_framework(store, framework.id)
+            confidence_after = promoted_framework.confidence
+            promoted = True
+
     misfit_detected = False
     distance: int | None = None
     if success:
@@ -122,6 +136,8 @@ async def reflect(
         if success
         else f"{framework.name}'s assumption didn't hold ({parsed_outcome.value})"
     )
+    if promoted:
+        note += " — promoted to trusted status"
 
     return ReflectionResult(
         match_id=match_id,
@@ -133,4 +149,5 @@ async def reflect(
         confidence_after=confidence_after,
         misfit_detected=misfit_detected,
         tree_distance=distance,
+        promoted=promoted,
     )

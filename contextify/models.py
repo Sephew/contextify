@@ -108,6 +108,11 @@ class Framework:
     applicability_condition: list[str] = field(default_factory=list)
     status: FrameworkStatus = FrameworkStatus.SEEDED
     confidence: float = 1.0
+    # Count of validated successful reflect() calls while this Framework has been
+    # PROVISIONAL — reaching the promotion threshold auto-promotes it to SEEDED
+    # (see contextify/framework_store/promotion.py). Meaningless for a Framework
+    # that's already SEEDED.
+    validated_successes: int = 0
 
     @property
     def is_root(self) -> bool:
@@ -157,3 +162,6 @@ class ReflectionResult:
     # Tree distance from the first-tried Framework to the one that eventually
     # succeeded; only meaningful when misfit_detected is True.
     tree_distance: int | None = None
+    # True when this reflection was the one that pushed a provisional Framework
+    # over the promotion threshold (see contextify/framework_store/promotion.py).
+    promoted: bool = False

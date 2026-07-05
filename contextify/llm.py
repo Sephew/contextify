@@ -78,7 +78,10 @@ def _render_tree(tree: list[Framework]) -> str:
     def walk(parent_id: str | None, depth: int) -> None:
         for node in by_parent.get(parent_id, []):
             indent = "  " * depth
-            lines.append(f"{indent}- id={node.id} name=\"{node.name}\"")
+            lines.append(
+                f"{indent}- id={node.id} name=\"{node.name}\" "
+                f"status={node.status.value} confidence={node.confidence}"
+            )
             for cond in node.applicability_condition:
                 lines.append(f"{indent}    · {cond}")
             walk(node.id, depth + 1)
