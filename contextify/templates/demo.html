@@ -4,24 +4,26 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Contextify — the right framework for how to think</title>
+<link rel="icon" type="image/png" href="/favicon.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
   :root {
     color-scheme: light;
-    --paper:   #eef0ec;
-    --paper-2: #e6e8e2;
-    --card:    #f6f7f3;
-    --ink:     #14293a;
-    --ink-2:   #4a5c6b;
-    --ink-3:   #7f8d97;
-    --blue:    #1c5d7c;
-    --blue-2:  #d3e0e5;
-    --ochre:   #a6791f;
-    --oxblood: #8e2c24;
-    --line:    #d6d8d2;
-    --line-2:  #c6c9c1;
+    /* Monochrome: white background, black text and elements. */
+    --paper:   #ffffff;
+    --paper-2: #f4f4f4;
+    --card:    #ffffff;
+    --ink:     #111111;
+    --ink-2:   #454545;
+    --ink-3:   #767676;
+    --blue:    #111111;
+    --blue-2:  #ebebeb;
+    --ochre:   #111111;
+    --oxblood: #111111;
+    --line:    #e4e4e4;
+    --line-2:  #cfcfcf;
   }
 
   * { box-sizing: border-box; }
@@ -78,9 +80,8 @@
     font-size: 1.3rem; letter-spacing: -0.01em;
     display: flex; align-items: baseline; gap: 0.55rem;
   }
-  .wordmark::before {
-    content: ""; width: 9px; height: 9px; border-radius: 50%;
-    background: var(--blue); align-self: center; flex: none;
+  .wordmark .mark {
+    width: 22px; height: 22px; align-self: center; flex: none; display: block;
   }
   .wordmark .edition {
     font-family: "IBM Plex Mono", monospace; font-size: 0.6rem;
@@ -95,6 +96,22 @@
     cursor: pointer;
   }
   .nav button:hover { border-color: var(--blue); color: var(--blue); }
+
+  /* ---- notice --------------------------------------------------------- */
+  .notice {
+    margin-top: 1.6rem; background: var(--paper-2);
+    border: 1px solid var(--line-2); border-left: 3px solid var(--ink);
+    border-radius: 4px; padding: 0.9rem 1.1rem;
+    display: flex; flex-wrap: wrap; gap: 0.55rem 0.9rem; align-items: flex-start;
+  }
+  .notice-tag {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.62rem;
+    text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink);
+    border: 1px solid var(--ink); border-radius: 2px; padding: 0.12rem 0.45rem;
+    flex: none; margin-top: 0.1rem; white-space: nowrap;
+  }
+  .notice p { margin: 0; flex: 1; min-width: 15rem; font-size: 0.85rem; color: var(--ink-2); line-height: 1.55; }
+  .notice p strong { color: var(--ink); font-weight: 600; }
 
   /* ---- hero / intake -------------------------------------------------- */
   .hero { padding: 3.4rem 0 2.6rem; }
@@ -453,6 +470,7 @@
     color: var(--ink-3); font-size: 0.78rem;
   }
   footer .wrap { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; align-items: baseline; }
+  footer .owner { margin-left: auto; color: var(--ink); font-family: "IBM Plex Mono", monospace; }
 
   @keyframes stampIn { to { opacity: 1; transform: translateY(0); } }
   @keyframes rungIn { to { opacity: 1; } }
@@ -475,7 +493,7 @@
 <body>
   <header class="masthead">
     <div class="wrap">
-      <div class="wordmark">Contextify <span class="edition">framework guide · v1</span></div>
+      <div class="wordmark"><img class="mark" src="/favicon.png" alt="" />Contextify <span class="edition">framework guide · v1</span></div>
       <nav class="nav">
         <button id="guide-btn" type="button">API</button>
         <button id="addfw-btn" type="button">Add a framework</button>
@@ -484,6 +502,12 @@
   </header>
 
   <main class="wrap">
+    <!-- NOTICE -->
+    <div class="notice">
+      <span class="notice-tag">Notice · Beta</span>
+      <p><strong>Built for testing &amp; debugging — but not limited to it.</strong> The framework approach applies across disciplines and other kinds of problems, not just software engineering. The longer aim: AI systems that think dynamically, minimizing error by maximizing the frame of thought.</p>
+    </div>
+
     <!-- HERO / INTAKE -->
     <section class="hero">
       <span class="eyebrow">The right framework for how to think</span>
@@ -571,6 +595,7 @@
       <span class="mono">Contextify</span>
       <span>Debugging &amp; Testing branches</span>
       <span>Problem → abstraction → framework</span>
+      <span class="owner">Built by Acumen · © 2026</span>
     </div>
   </footer>
 

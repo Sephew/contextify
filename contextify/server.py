@@ -13,7 +13,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Security
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 
@@ -238,6 +238,13 @@ async def delete_framework(framework_id: str) -> dict:
 
 
 _DEMO_TEMPLATE = Path(__file__).parent / "templates" / "demo.html"
+_FAVICON = Path(__file__).parent / "templates" / "favicon.png"
+
+
+@app.get("/favicon.png", include_in_schema=False)
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon() -> FileResponse:
+    return FileResponse(_FAVICON, media_type="image/png")
 
 
 @app.get("/", response_class=HTMLResponse)
