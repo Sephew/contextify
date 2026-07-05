@@ -3,182 +3,544 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Contextify — Framework Retrieval Demo</title>
+<title>Contextify — a diagnostic key for how to think</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
-  :root { color-scheme: light dark; }
+  :root {
+    color-scheme: light;
+    --paper:   #eef0ec;
+    --paper-2: #e6e8e2;
+    --card:    #f6f7f3;
+    --ink:     #14293a;
+    --ink-2:   #4a5c6b;
+    --ink-3:   #7f8d97;
+    --blue:    #1c5d7c;
+    --blue-2:  #d3e0e5;
+    --ochre:   #a6791f;
+    --oxblood: #8e2c24;
+    --line:    #d6d8d2;
+    --line-2:  #c6c9c1;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    max-width: 780px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem;
-    background: #0f172a; color: #e2e8f0;
+    margin: 0;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--paper);
+    line-height: 1.55;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
   }
-  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; display: inline-block; }
-  h2 { font-size: 1rem; color: #cbd5e1; margin: 0 0 0.75rem 0; }
-  p.sub { color: #94a3b8; margin-top: 0; margin-bottom: 1.5rem; font-size: 0.9rem; }
-  .top-row { display: flex; justify-content: space-between; align-items: baseline; }
-  section { margin-top: 2.25rem; }
-  textarea {
-    width: 100%; min-height: 120px; box-sizing: border-box;
-    background: #1e293b; color: #e2e8f0; border: 1px solid #334155;
-    border-radius: 8px; padding: 0.75rem; font-size: 0.95rem; resize: vertical;
-    font-family: inherit;
+
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 1.5rem; }
+
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  ::selection { background: var(--blue); color: #fff; }
+
+  :focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+    border-radius: 2px;
   }
-  input, select {
-    background: #1e293b; color: #e2e8f0; border: 1px solid #334155;
-    border-radius: 6px; padding: 0.5rem 0.6rem; font-size: 0.9rem;
-    box-sizing: border-box; font-family: inherit;
+
+  /* ---- type primitives ------------------------------------------------ */
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--blue);
+    font-weight: 500;
   }
-  label { display: block; font-size: 0.8rem; color: #94a3b8; margin: 0.75rem 0 0.25rem; }
-  button {
-    background: #4f46e5; color: white; border: none;
-    padding: 0.55rem 1.3rem; border-radius: 6px; font-size: 0.9rem; cursor: pointer;
+  .mono { font-family: "IBM Plex Mono", monospace; }
+  .serif { font-family: "Fraunces", Georgia, serif; }
+
+  /* ---- masthead ------------------------------------------------------- */
+  .masthead {
+    border-bottom: 1px solid var(--line);
+    background: var(--paper);
+    position: sticky; top: 0; z-index: 20;
   }
-  button.ghost { background: transparent; border: 1px solid #475569; color: #cbd5e1; }
-  button:disabled { background: #475569; cursor: default; }
-  #result { margin-top: 1.25rem; }
-  .card {
-    background: #1e293b; border: 1px solid #334155; border-radius: 10px;
-    padding: 1.25rem 1.5rem;
+  .masthead .wrap {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding-top: 0.9rem; padding-bottom: 0.9rem; gap: 1rem;
   }
-  .path { color: #94a3b8; font-size: 0.85rem; margin-bottom: 0.25rem; }
-  .fw-name { font-size: 1.3rem; font-weight: 600; margin: 0 0 0.5rem 0; }
-  .badge {
-    display: inline-block; font-size: 0.7rem; padding: 0.15rem 0.55rem;
-    border-radius: 999px; margin-left: 0.5rem; vertical-align: middle;
+  .wordmark {
+    font-family: "Fraunces", serif; font-weight: 500;
+    font-size: 1.3rem; letter-spacing: -0.01em;
+    display: flex; align-items: baseline; gap: 0.55rem;
   }
-  .badge.low { background: #7c2d12; color: #fed7aa; }
-  .badge.provisional { background: #422006; color: #fde68a; }
-  .badge.seeded { background: #1e3a5f; color: #93c5fd; }
-  .rationale { color: #cbd5e1; margin-top: 0.75rem; line-height: 1.5; }
-  .meta { margin-top: 1rem; font-size: 0.8rem; color: #64748b; }
-  .bar-track { background: #334155; border-radius: 999px; height: 6px; margin-top: 0.75rem; overflow: hidden; }
-  .bar-fill { background: #4f46e5; height: 100%; }
-  .error { color: #fca5a5; }
-  .examples { margin-top: 0.75rem; font-size: 0.8rem; }
+  .wordmark::before {
+    content: ""; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--blue); align-self: center; flex: none;
+  }
+  .wordmark .edition {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.6rem;
+    text-transform: uppercase; letter-spacing: 0.16em; color: var(--ink-3);
+    font-weight: 500;
+  }
+  .nav { display: flex; gap: 0.4rem; }
+  .nav button {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.72rem;
+    letter-spacing: 0.04em; background: transparent; color: var(--ink-2);
+    border: 1px solid var(--line-2); padding: 0.35rem 0.7rem; border-radius: 3px;
+    cursor: pointer;
+  }
+  .nav button:hover { border-color: var(--blue); color: var(--blue); }
+
+  /* ---- hero / intake -------------------------------------------------- */
+  .hero { padding: 3.4rem 0 2.6rem; }
+  .hero h1 {
+    font-family: "Fraunces", serif; font-weight: 400;
+    font-size: clamp(2.1rem, 5.4vw, 3.35rem); line-height: 1.04;
+    letter-spacing: -0.015em; margin: 0.9rem 0 0; color: var(--ink);
+    max-width: 15ch;
+  }
+  .hero h1 em { font-style: italic; }
+  .hero .lede {
+    margin: 1.15rem 0 0; max-width: 56ch; color: var(--ink-2);
+    font-size: 1.05rem;
+  }
+
+  /* intake console */
+  .console {
+    margin-top: 2rem; background: var(--card);
+    border: 1px solid var(--line-2); border-radius: 6px;
+    position: relative; overflow: hidden;
+  }
+  .console::before {
+    /* faint blueprint grid */
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 26px 26px; opacity: 0.35;
+    -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0.5), transparent 70%);
+            mask-image: linear-gradient(180deg, rgba(0,0,0,0.5), transparent 70%);
+  }
+  .console-inner { position: relative; padding: 1.5rem 1.5rem 1.35rem; }
+  .console-label {
+    display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.7rem;
+  }
+  .console-label .n {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.68rem;
+    color: #fff; background: var(--blue); border-radius: 2px;
+    padding: 0.05rem 0.35rem; font-weight: 500;
+  }
+  textarea#input {
+    width: 100%; min-height: 118px; resize: vertical;
+    background: #fff; color: var(--ink);
+    border: 1px solid var(--line-2); border-radius: 4px;
+    padding: 0.85rem 0.95rem; font-size: 1rem; line-height: 1.5;
+    font-family: "IBM Plex Sans", sans-serif;
+  }
+  textarea#input::placeholder { color: var(--ink-3); }
+  textarea#input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-2); }
+
+  .examples { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.8rem; }
   .examples button {
-    background: #1e293b; border: 1px solid #334155; color: #94a3b8;
-    padding: 0.3rem 0.6rem; font-size: 0.75rem; margin: 0.25rem 0.35rem 0 0; border-radius: 999px;
+    font-family: "IBM Plex Mono", monospace; font-size: 0.72rem;
+    background: transparent; color: var(--ink-2);
+    border: 1px dashed var(--line-2); border-radius: 999px;
+    padding: 0.3rem 0.7rem; cursor: pointer;
   }
+  .examples button:hover { border-color: var(--blue); border-style: solid; color: var(--blue); }
+  .examples .ex-label {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.68rem;
+    color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em;
+    align-self: center; margin-right: 0.15rem;
+  }
+
+  .console-actions {
+    display: flex; align-items: center; gap: 1rem; margin-top: 1.15rem;
+  }
+  button.run {
+    font-family: "IBM Plex Sans", sans-serif; font-weight: 600; font-size: 0.95rem;
+    background: var(--ink); color: var(--paper); border: none;
+    padding: 0.68rem 1.4rem; border-radius: 4px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 0.5rem;
+  }
+  button.run::after { content: "↳"; font-size: 1.05em; opacity: 0.8; }
+  button.run:hover { background: var(--blue); }
+  button.run:disabled { background: var(--ink-3); cursor: default; }
+
+  /* ---- trace strip ---------------------------------------------------- */
   #log {
-    display: none; font-family: ui-monospace, Menlo, Consolas, monospace;
-    font-size: 0.8rem; color: #94a3b8; background: #1e293b; border: 1px solid #334155;
-    border-radius: 8px; padding: 0.75rem 1rem; margin-top: 1rem; white-space: pre-wrap;
+    display: none; font-family: "IBM Plex Mono", monospace; font-size: 0.76rem;
+    color: var(--ink-2); border-left: 2px solid var(--blue);
+    padding: 0.2rem 0 0.2rem 0.85rem; margin-top: 1.4rem;
+    white-space: pre-wrap; line-height: 1.65;
   }
-  #log .line { margin: 0.15rem 0; }
-  #log .line.done { color: #6ee7b7; }
-  .tree { display: flex; flex-direction: column; gap: 0.4rem; }
-  .branch-group { margin-bottom: 0.75rem; }
-  .branch-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 0.4rem; }
+  #log .line { margin: 0.12rem 0; }
+  #log .line::before { content: "· "; color: var(--ink-3); }
+  #log .line.done { color: var(--blue); }
+  #log .line.done::before { content: "✓ "; color: var(--blue); }
+  #log .line.err { color: var(--oxblood); }
+  #log .line.err::before { content: "✗ "; color: var(--oxblood); }
+
+  /* ---- section scaffolding ------------------------------------------- */
+  section.block { padding: 2.6rem 0; border-top: 1px solid var(--line); }
+  .block-head { display: flex; align-items: baseline; gap: 0.9rem; margin-bottom: 1.4rem; }
+  .block-head .kn {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.72rem; color: var(--blue);
+    border: 1px solid var(--blue); border-radius: 2px; padding: 0.05rem 0.4rem;
+    align-self: center;
+  }
+  .block-head h2 {
+    font-family: "Fraunces", serif; font-weight: 500; font-size: 1.5rem;
+    margin: 0; letter-spacing: -0.01em;
+  }
+  .block-head .note { margin-left: auto; color: var(--ink-3); font-size: 0.82rem; align-self: center; }
+
+  /* ---- result / descent ---------------------------------------------- */
+  #result { margin-top: 1.5rem; }
+  .readout {
+    display: grid; grid-template-columns: minmax(0, 260px) 1fr; gap: 0;
+    border: 1px solid var(--line-2); border-radius: 6px; overflow: hidden;
+    background: var(--card);
+  }
+  .intake {
+    background: var(--paper-2); border-right: 1px solid var(--line-2);
+    padding: 1.25rem 1.25rem 1.4rem;
+  }
+  .intake .cap {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.66rem;
+    text-transform: uppercase; letter-spacing: 0.16em; color: var(--ink-3);
+    margin-bottom: 0.9rem;
+  }
+  .intake .field { margin-bottom: 0.95rem; opacity: 0; transform: translateY(4px); }
+  .intake.reveal .field { animation: stampIn 0.34s ease forwards; }
+  .intake .field:nth-child(2) { animation-delay: 0.02s; }
+  .intake .field:nth-child(3) { animation-delay: 0.10s; }
+  .intake .field:nth-child(4) { animation-delay: 0.18s; }
+  .intake .field:nth-child(5) { animation-delay: 0.26s; }
+  .intake dt {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.64rem;
+    text-transform: uppercase; letter-spacing: 0.08em; color: var(--ochre);
+    margin-bottom: 0.12rem;
+  }
+  .intake dd {
+    margin: 0; font-family: "IBM Plex Mono", monospace; font-size: 0.82rem;
+    color: var(--ink); line-height: 1.4; word-break: break-word;
+  }
+
+  .descent { padding: 1.4rem 1.5rem 1.5rem; }
+  .descent .cap {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.66rem;
+    text-transform: uppercase; letter-spacing: 0.16em; color: var(--ink-3);
+    margin-bottom: 1.1rem;
+  }
+  ol.path { list-style: none; margin: 0; padding: 0; position: relative; }
+  ol.path .rung {
+    position: relative; padding: 0 0 0.85rem 1.9rem; opacity: 0;
+    animation: rungIn 0.3s ease forwards;
+  }
+  ol.path .rung::before {
+    /* node */
+    content: ""; position: absolute; left: 3px; top: 5px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--paper); border: 2px solid var(--blue); z-index: 2;
+  }
+  ol.path .rung::after {
+    /* connector line down */
+    content: ""; position: absolute; left: 7px; top: 8px; bottom: -3px;
+    width: 2px; background: var(--blue); opacity: 0.4; z-index: 1;
+  }
+  ol.path .rung:last-child::after { display: none; }
+  ol.path .rung .rn {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.66rem; color: var(--ink-3);
+    display: block; letter-spacing: 0.05em;
+  }
+  ol.path .rung .rlabel {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.9rem; color: var(--ink-2);
+  }
+  ol.path .rung.terminal { padding-bottom: 0.2rem; }
+  ol.path .rung.terminal::before {
+    background: var(--blue); width: 11px; height: 11px; left: 2px; top: 6px;
+  }
+  ol.path .rung.terminal .rlabel {
+    font-family: "Fraunces", serif; font-size: 1.55rem; font-weight: 500;
+    color: var(--ink); letter-spacing: -0.01em; line-height: 1.15;
+    display: block; margin-top: 0.05rem;
+  }
+
+  .verdict { margin-top: 1.4rem; padding-top: 1.3rem; border-top: 1px dashed var(--line-2); }
+  .conf-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+  .conf-row .lbl {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.66rem;
+    text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-3);
+  }
+  .conf-row .val { font-family: "IBM Plex Mono", monospace; font-size: 0.85rem; color: var(--ink); font-weight: 500; }
+  .bar-track { background: var(--paper-2); border: 1px solid var(--line-2); border-radius: 999px; height: 7px; margin-top: 0.5rem; overflow: hidden; }
+  .bar-fill { background: var(--ochre); height: 100%; width: 0; transition: width 0.6s ease; }
+  .bar-fill.low { background: var(--oxblood); }
+  .rationale { color: var(--ink); margin-top: 1.05rem; line-height: 1.6; font-size: 0.98rem; }
+  .rationale .q { font-family: "Fraunces", serif; }
+  .low-note {
+    display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 0.9rem;
+    font-family: "IBM Plex Mono", monospace; font-size: 0.72rem;
+    color: var(--oxblood); border: 1px solid var(--oxblood); border-radius: 3px;
+    padding: 0.25rem 0.55rem;
+  }
+
+  .error { color: var(--oxblood); }
+  .result-error {
+    border: 1px solid var(--oxblood); border-radius: 6px; padding: 1rem 1.25rem;
+    color: var(--oxblood); background: #fff; font-family: "IBM Plex Mono", monospace; font-size: 0.85rem;
+  }
+
+  /* ---- the key (framework tree) -------------------------------------- */
+  .tree { display: flex; flex-direction: column; gap: 1.6rem; }
+  .branch-group { }
+  .branch-title {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.7rem;
+    text-transform: uppercase; letter-spacing: 0.18em; color: var(--blue);
+    margin-bottom: 0.7rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .branch-title::before { content: "§"; color: var(--ink-3); }
   .fw-item {
-    background: #1e293b; border: 1px solid #334155; border-radius: 6px;
-    font-size: 0.85rem; overflow: hidden;
+    border-bottom: 1px solid var(--line); overflow: hidden;
   }
-  .fw-item + .fw-item { margin-top: 0.35rem; }
   .fw-row {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 0.5rem 0.75rem; cursor: pointer; user-select: none;
+    display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+    padding: 0.7rem 0.25rem; cursor: pointer; user-select: none;
   }
-  .fw-row:hover { background: #24324a; }
-  .fw-row .name { font-weight: 500; }
-  .fw-row .name .chevron { display: inline-block; margin-right: 0.4rem; color: #64748b; transition: transform 0.15s; font-size: 0.7rem; }
+  .fw-row:hover { background: var(--card); }
+  .fw-row .name {
+    font-family: "Fraunces", serif; font-size: 1.06rem; font-weight: 500;
+    display: flex; align-items: baseline; gap: 0.55rem;
+  }
+  .fw-row .name .chevron {
+    font-family: "IBM Plex Mono", monospace; color: var(--blue); font-size: 0.7rem;
+    transition: transform 0.15s; display: inline-block;
+  }
   .fw-item.open .fw-row .name .chevron { transform: rotate(90deg); }
-  .fw-row .conf { color: #64748b; font-size: 0.75rem; }
+  .fw-row .meta-right { display: flex; align-items: center; gap: 0.7rem; flex: none; }
+  .fw-row .conf {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.72rem; color: var(--ink-3);
+  }
+
+  /* specimen-label status tags */
+  .badge {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.62rem;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 0.12rem 0.45rem; border-radius: 2px; border: 1px solid;
+    white-space: nowrap;
+  }
+  .badge.seeded    { color: var(--blue);    border-color: var(--blue);    background: var(--blue-2); }
+  .badge.trusted   { color: var(--paper);   border-color: var(--ink);     background: var(--ink); }
+  .badge.provisional { color: var(--ochre); border-color: var(--ochre);   background: #f0e6cd; }
+  .badge.low       { color: var(--oxblood); border-color: var(--oxblood); background: #f4dcd9; }
+
   .fw-detail {
-    display: none; padding: 0 0.75rem 0.75rem 1.7rem; font-size: 0.8rem; color: #94a3b8;
-    border-top: 1px solid #334155;
+    display: none; padding: 0.2rem 0.25rem 1rem 1.6rem; font-size: 0.85rem;
+    color: var(--ink-2);
   }
   .fw-item.open .fw-detail { display: block; }
-  .fw-detail dl { margin: 0.5rem 0; }
-  .fw-detail dt { color: #64748b; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; margin-top: 0.5rem; }
-  .fw-detail dd { margin: 0.15rem 0 0; color: #cbd5e1; }
-  .fw-detail ul { margin: 0.15rem 0 0; padding-left: 1.1rem; }
-  .fw-detail li { margin-bottom: 0.2rem; }
+  .fw-detail dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; }
+  .fw-detail dt {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.64rem; color: var(--ink-3);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .fw-detail dd { margin: 0; color: var(--ink); font-family: "IBM Plex Mono", monospace; font-size: 0.78rem; }
+  .fw-detail dd ul { margin: 0; padding-left: 1rem; }
+  .fw-detail dd li { margin-bottom: 0.15rem; }
+  .fw-root-note { color: var(--ink-3); font-style: italic; }
   .fw-delete {
-    background: transparent; border: 1px solid #7f1d1d; color: #fca5a5;
-    font-size: 0.7rem; padding: 0.2rem 0.55rem; border-radius: 6px; margin-top: 0.6rem;
+    background: transparent; border: 1px solid var(--line-2); color: var(--ink-2);
+    font-family: "IBM Plex Mono", monospace; font-size: 0.7rem;
+    padding: 0.25rem 0.6rem; border-radius: 3px; margin-top: 0.85rem; cursor: pointer;
   }
-  .fw-delete:hover { background: #7f1d1d; color: #fecaca; }
-  .fw-root-note { color: #475569; font-style: italic; }
-  #guide-panel, #addfw-panel {
-    display: none; margin-top: 1rem; background: #1e293b; border: 1px solid #334155;
-    border-radius: 8px; padding: 1rem 1.25rem;
+  .fw-delete:hover { border-color: var(--oxblood); color: var(--oxblood); }
+
+  /* ---- appendix panels (guide + add) --------------------------------- */
+  .panel {
+    display: none; margin-top: 1.2rem; background: var(--card);
+    border: 1px solid var(--line-2); border-radius: 6px; padding: 1.35rem 1.5rem;
   }
+  .panel h3 {
+    font-family: "Fraunces", serif; font-weight: 500; font-size: 1.15rem; margin: 0 0 0.35rem;
+  }
+  .panel .panel-sub { color: var(--ink-3); font-size: 0.85rem; margin: 0 0 1.1rem; }
+  .endpoint {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.76rem; color: var(--ink-2);
+    margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem;
+  }
+  .endpoint .verb {
+    color: #fff; background: var(--blue); border-radius: 2px; padding: 0.05rem 0.4rem;
+    font-size: 0.66rem; font-weight: 500;
+  }
+  .endpoint .verb.del { background: var(--oxblood); }
   pre.curl {
-    background: #0f172a; border: 1px solid #334155; border-radius: 6px;
-    padding: 0.75rem; font-size: 0.75rem; overflow-x: auto; color: #a5b4fc;
-    margin: 0.4rem 0 1rem;
+    background: #fff; border: 1px solid var(--line); border-left: 2px solid var(--blue);
+    border-radius: 4px; padding: 0.75rem 0.9rem; font-size: 0.74rem; overflow-x: auto;
+    color: var(--ink); margin: 0.45rem 0 0; font-family: "IBM Plex Mono", monospace;
+    line-height: 1.5;
   }
-  .fw-added { color: #6ee7b7; font-size: 0.85rem; margin-top: 0.6rem; }
+
+  label {
+    display: block; font-family: "IBM Plex Mono", monospace; font-size: 0.68rem;
+    text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3);
+    margin: 1rem 0 0.3rem;
+  }
+  input, select, textarea.addfw {
+    width: 100%; background: #fff; color: var(--ink);
+    border: 1px solid var(--line-2); border-radius: 4px; padding: 0.55rem 0.65rem;
+    font-size: 0.9rem; font-family: "IBM Plex Sans", sans-serif;
+  }
+  input:focus, select:focus, textarea.addfw:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-2); }
+  textarea.addfw { font-family: "IBM Plex Mono", monospace; min-height: 70px; resize: vertical; }
+  button.submit-fw {
+    margin-top: 1.15rem; font-family: "IBM Plex Sans", sans-serif; font-weight: 600;
+    background: var(--ink); color: var(--paper); border: none;
+    padding: 0.6rem 1.2rem; border-radius: 4px; cursor: pointer;
+  }
+  button.submit-fw:hover { background: var(--blue); }
+  button.ghost {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.76rem; cursor: pointer;
+    background: transparent; color: var(--blue); border: 1px solid var(--line-2);
+    border-radius: 4px; padding: 0.45rem 0.9rem;
+  }
+  button.ghost:hover { border-color: var(--blue); }
+  .fw-added { color: var(--blue); font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; margin-top: 0.8rem; }
+  #fw-status .error { font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; margin-top: 0.8rem; display: block; }
+
+  .loading { color: var(--ink-3); font-family: "IBM Plex Mono", monospace; font-size: 0.82rem; }
+
+  footer {
+    border-top: 1px solid var(--line); padding: 1.8rem 0 2.6rem;
+    color: var(--ink-3); font-size: 0.78rem;
+  }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; align-items: baseline; }
+
+  @keyframes stampIn { to { opacity: 1; transform: translateY(0); } }
+  @keyframes rungIn { to { opacity: 1; } }
+
+  @media (max-width: 640px) {
+    .readout { grid-template-columns: 1fr; }
+    .intake { border-right: none; border-bottom: 1px solid var(--line-2); }
+    .masthead .wrap { flex-direction: column; align-items: flex-start; gap: 0.6rem; }
+    .block-head { flex-wrap: wrap; }
+    .block-head .note { margin-left: 0; width: 100%; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+    .intake .field { opacity: 1; transform: none; }
+    ol.path .rung { opacity: 1; }
+  }
 </style>
 </head>
 <body>
-  <div class="top-row">
-    <h1>Contextify</h1>
-    <button class="ghost" id="guide-btn" type="button">API Guide</button>
-  </div>
-  <p class="sub">Retrieve the right reasoning framework for a problem — not similar code, the correct way of thinking about it. Covers the Debugging and Testing branches.</p>
-
-  <div id="guide-panel">
-    <h2>Using the API directly</h2>
-    <p style="font-size:0.85rem;color:#94a3b8;margin-top:0;">This page is a demo only. Everything below hits the same hosted API, with your key already filled in.</p>
-
-    <div>POST /retrieve</div>
-    <pre class="curl" id="curl-retrieve"></pre>
-
-    <div>POST /reflect (record a real-world outcome against a match_id)</div>
-    <pre class="curl" id="curl-reflect"></pre>
-
-    <div>GET /frameworks (list the current tree)</div>
-    <pre class="curl" id="curl-frameworks"></pre>
-
-    <div>POST /frameworks (add a new provisional framework)</div>
-    <pre class="curl" id="curl-frameworks-create"></pre>
-
-    <div>DELETE /frameworks/{id} (remove a framework — branch roots and frameworks with children are rejected)</div>
-    <pre class="curl" id="curl-frameworks-delete"></pre>
-  </div>
-
-  <section>
-    <h2>Available frameworks</h2>
-    <div class="tree" id="frameworks-tree">
-      <div style="color:#64748b;font-size:0.85rem;">loading...</div>
+  <header class="masthead">
+    <div class="wrap">
+      <div class="wordmark">Contextify <span class="edition">field guide · v1</span></div>
+      <nav class="nav">
+        <button id="guide-btn" type="button">API</button>
+        <button id="addfw-btn" type="button">Extend the key</button>
+      </nav>
     </div>
-  </section>
+  </header>
 
-  <section>
-    <h2>Get a framework for a problem</h2>
-    <textarea id="input" placeholder="Describe a bug, or a testing concern — e.g. &quot;Tests fail intermittently on CI only, pass locally, no stack trace&quot;"></textarea>
-    <div class="examples">
-      <button type="button" data-ex="Users report the page crashes sometimes but I can never reproduce it locally, no stack trace available.">Example: flaky crash</button>
-      <button type="button" data-ex="I want to make sure my new date-parsing function is well tested before merging, need good test coverage.">Example: test coverage</button>
-      <button type="button" data-ex="This worked yesterday and now every request returns stale data until I restart the server.">Example: stale data</button>
+  <main class="wrap">
+    <!-- HERO / INTAKE -->
+    <section class="hero">
+      <span class="eyebrow">A diagnostic key for how to think</span>
+      <h1>Retrieve the <em>way of thinking</em>, not the answer.</h1>
+      <p class="lede">Describe a bug or a testing worry. Contextify reads it down to its shape, then walks a branching key across the Debugging and Testing branches to the reasoning framework that actually fits.</p>
+
+      <div class="console">
+        <div class="console-inner">
+          <div class="console-label">
+            <span class="n">01</span>
+            <span class="eyebrow">Describe the problem</span>
+          </div>
+          <textarea id="input" placeholder="e.g. Tests fail intermittently on CI only — pass locally, no stack trace to go on."></textarea>
+          <div class="examples">
+            <span class="ex-label">try</span>
+            <button type="button" data-ex="Users report the page crashes sometimes but I can never reproduce it locally, no stack trace available.">a flaky crash</button>
+            <button type="button" data-ex="I want to make sure my new date-parsing function is well tested before merging, need good test coverage.">test coverage</button>
+            <button type="button" data-ex="This worked yesterday and now every request returns stale data until I restart the server.">stale data</button>
+          </div>
+          <div class="console-actions">
+            <button class="run" id="submit">Run the key</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="log"></div>
+      <div id="result"></div>
+    </section>
+
+    <!-- THE KEY (framework tree) -->
+    <section class="block">
+      <div class="block-head">
+        <span class="kn">§</span>
+        <h2>The key</h2>
+        <span class="note">Every framework retrieval walks this tree · click a leaf to inspect</span>
+      </div>
+      <div class="tree" id="frameworks-tree">
+        <div class="loading">reading the key…</div>
+      </div>
+    </section>
+
+    <!-- APPENDIX: API -->
+    <div id="guide-panel" class="panel">
+      <h3>Call it directly</h3>
+      <p class="panel-sub">This page is a demo over the same hosted API — the key below is already filled in for you.</p>
+
+      <div class="endpoint"><span class="verb">POST</span> /retrieve — match a problem to a framework</div>
+      <pre class="curl" id="curl-retrieve"></pre>
+
+      <div class="endpoint"><span class="verb">POST</span> /reflect — record a real outcome against a match_id</div>
+      <pre class="curl" id="curl-reflect"></pre>
+
+      <div class="endpoint"><span class="verb">GET</span> /frameworks — list the current tree</div>
+      <pre class="curl" id="curl-frameworks"></pre>
+
+      <div class="endpoint"><span class="verb">POST</span> /frameworks — add a provisional framework</div>
+      <pre class="curl" id="curl-frameworks-create"></pre>
+
+      <div class="endpoint"><span class="verb del">DELETE</span> /frameworks/{id} — remove one (branch roots &amp; parents rejected)</div>
+      <pre class="curl" id="curl-frameworks-delete"></pre>
     </div>
-    <br/>
-    <button id="submit">Get framework</button>
 
-    <div id="log"></div>
-    <div id="result"></div>
-  </section>
-
-  <section>
-    <h2>Add a new framework <span style="font-weight:400;color:#64748b;font-size:0.8rem;">(enters as provisional, per the promotion gate)</span></h2>
-    <button class="ghost" id="addfw-btn" type="button">+ New framework</button>
-    <div id="addfw-panel">
+    <!-- APPENDIX: ADD FRAMEWORK -->
+    <div id="addfw-panel" class="panel">
+      <h3>Extend the key</h3>
+      <p class="panel-sub">New frameworks enter as <strong>provisional</strong> and promote to trusted after three validated successes — the human-in-the-loop gate.</p>
       <label for="fw-name">Name</label>
-      <input id="fw-name" placeholder="e.g. Rubber Duck Debugging" style="width:100%;" />
+      <input id="fw-name" placeholder="e.g. Rubber Duck Debugging" />
       <label for="fw-branch">Branch</label>
-      <select id="fw-branch" style="width:100%;">
+      <select id="fw-branch">
         <option value="debugging">Debugging</option>
         <option value="testing">Testing</option>
       </select>
-      <label for="fw-parent">Parent framework id</label>
-      <select id="fw-parent" style="width:100%;"></select>
+      <label for="fw-parent">Parent framework</label>
+      <select id="fw-parent"></select>
       <label for="fw-conditions">Applicability condition (one per line)</label>
-      <textarea id="fw-conditions" style="min-height:70px;" placeholder="reproducibility: deterministic&#10;evidence_available: report_only"></textarea>
-      <br/><br/>
-      <button id="fw-submit">Add framework</button>
+      <textarea id="fw-conditions" class="addfw" placeholder="reproducibility: deterministic&#10;evidence_available: report_only"></textarea>
+      <button class="submit-fw" id="fw-submit">Add framework</button>
       <div id="fw-status"></div>
     </div>
-  </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span class="mono">Contextify</span>
+      <span>Debugging &amp; Testing branches</span>
+      <span>Retrieval → abstraction → key descent → framework</span>
+    </div>
+  </footer>
 
 <script>
 const API_KEY = "__API_KEY__";
@@ -201,29 +563,29 @@ async function apiPost(path, body) {
   return data;
 }
 
-// --- Frameworks list ---------------------------------------------------
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// --- The key (framework tree) -------------------------------------------
 function renderFrameworkRow(f) {
   const conditions = (f.applicability_condition || [])
     .map(c => `<li>${escapeHtml(c)}</li>`).join('') || '<li class="fw-root-note">none recorded</li>';
   return `
     <div class="fw-item" data-id="${f.id}">
       <div class="fw-row" data-toggle="${f.id}">
-        <span class="name"><span class="chevron">▶</span>${f.name}</span>
-        <span>
-          <span class="conf">conf ${f.confidence.toFixed(2)}</span>
+        <span class="name"><span class="chevron">▶</span>${escapeHtml(f.name)}</span>
+        <span class="meta-right">
+          <span class="conf">${f.confidence.toFixed(2)}</span>
           <span class="badge ${f.status}">${f.status}</span>
         </span>
       </div>
       <div class="fw-detail">
         <dl>
-          <dt>id</dt><dd>${f.id}</dd>
-          <dt>parent</dt><dd>${f.parent || '(branch root)'}</dd>
-          <dt>validated successes</dt><dd>${f.validated_successes} ${f.status === 'provisional' ? '(promotes to trusted at 3)' : ''}</dd>
-          <dt>applicability condition</dt><dd><ul>${conditions}</ul></dd>
+          <dt>id</dt><dd>${escapeHtml(f.id)}</dd>
+          <dt>parent</dt><dd>${escapeHtml(f.parent || '(branch root)')}</dd>
+          <dt>successes</dt><dd>${f.validated_successes}${f.status === 'provisional' ? ' — promotes to trusted at 3' : ''}</dd>
+          <dt>applies&nbsp;when</dt><dd><ul>${conditions}</ul></dd>
         </dl>
         ${f.parent !== null ? `<button class="fw-delete" data-delete="${f.id}">Delete framework</button>` : '<div class="fw-root-note">branch roots can\'t be deleted</div>'}
       </div>
@@ -240,13 +602,13 @@ async function loadFrameworks() {
     });
     treeEl.innerHTML = Object.entries(branches).map(([branch, items]) => `
       <div class="branch-group">
-        <div class="branch-title">${branch}</div>
+        <div class="branch-title">${escapeHtml(branch)}</div>
         ${items.filter(f => f.parent !== null).map(renderFrameworkRow).join('')}
       </div>`).join('');
     populateParentSelect(frameworks);
     wireFrameworkRows();
   } catch (e) {
-    treeEl.innerHTML = `<div class="error">Could not load frameworks: ${e}</div>`;
+    treeEl.innerHTML = `<div class="error mono">Couldn't read the key: ${e}</div>`;
   }
 }
 
@@ -262,7 +624,7 @@ function wireFrameworkRows() {
       const id = btn.dataset.delete;
       if (!confirm(`Delete framework "${id}"? This can't be undone.`)) return;
       btn.disabled = true;
-      btn.textContent = 'Deleting...';
+      btn.textContent = 'Deleting…';
       try {
         await fetch(`${BASE}/frameworks/${encodeURIComponent(id)}`, {
           method: 'DELETE', headers: { 'X-API-Key': API_KEY }
@@ -272,7 +634,7 @@ function wireFrameworkRows() {
         });
         loadFrameworks();
       } catch (e) {
-        alert(`Could not delete: ${e}`);
+        alert(`Couldn't delete: ${e}`);
         btn.disabled = false;
         btn.textContent = 'Delete framework';
       }
@@ -283,76 +645,120 @@ function wireFrameworkRows() {
 function populateParentSelect(frameworks) {
   const sel = document.getElementById('fw-parent');
   const roots = frameworks.filter(f => f.parent === null);
-  sel.innerHTML = roots.map(f => `<option value="${f.id}">${f.name} (${f.id})</option>`).join('');
+  sel.innerHTML = roots.map(f => `<option value="${f.id}">${escapeHtml(f.name)} (${escapeHtml(f.id)})</option>`).join('');
 }
 
-// --- Example buttons -----------------------------------------------------
+// --- Example chips -------------------------------------------------------
 document.querySelectorAll('.examples button').forEach(b => {
-  b.addEventListener('click', () => { document.getElementById('input').value = b.dataset.ex; });
+  b.addEventListener('click', () => {
+    const t = document.getElementById('input');
+    t.value = b.dataset.ex;
+    t.focus();
+  });
 });
 
-// --- Get framework, with a real 2-step log ------------------------------
-function logLine(text, done = false) {
+// --- Trace log -----------------------------------------------------------
+function logLine(text, cls = '') {
   const logEl = document.getElementById('log');
   logEl.style.display = 'block';
   const div = document.createElement('div');
-  div.className = 'line' + (done ? ' done' : '');
+  div.className = 'line' + (cls ? ' ' + cls : '');
   div.textContent = text;
   logEl.appendChild(div);
 }
 
+// --- Run the key ---------------------------------------------------------
 document.getElementById('submit').addEventListener('click', async () => {
   const input = document.getElementById('input').value.trim();
   const resultEl = document.getElementById('result');
   const logEl = document.getElementById('log');
   const btn = document.getElementById('submit');
-  if (!input) return;
+  if (!input) { document.getElementById('input').focus(); return; }
 
   btn.disabled = true;
-  btn.textContent = "Thinking...";
+  btn.textContent = "Reading…";
   resultEl.innerHTML = "";
   logEl.innerHTML = "";
   logEl.style.display = 'block';
 
   try {
-    logLine("→ sending problem to LLM for Problem Abstraction...");
-    const abstraction = await apiPost('/abstract', { raw_input: input });
-    logLine(`✓ abstracted: symptom="${abstraction.symptom}" · reproducibility=${abstraction.reproducibility} · goal=${abstraction.goal_shape} · evidence=[${abstraction.evidence_available.join(', ') || 'none'}]`, true);
+    logLine("reducing the problem to its shape (abstraction)…");
+    const a = await apiPost('/abstract', { raw_input: input });
+    logLine(`shape read — symptom="${a.symptom}" · reproducibility=${a.reproducibility} · goal=${a.goal_shape} · evidence=[${a.evidence_available.join(', ') || 'none'}]`, 'done');
 
-    logLine("→ walking the framework tree (Debugging + Testing) for the best-fit match...");
+    logLine("walking the key across the Debugging + Testing branches…");
     const data = await apiPost('/retrieve', { raw_input: input });
-    logLine("✓ match resolved", true);
+    logLine("terminal framework reached", 'done');
 
-    const confPct = Math.round(data.confidence * 100);
-    const lowBadge = data.low_confidence
-      ? '<span class="badge low">low confidence — ambiguous match</span>' : '';
-    resultEl.innerHTML = `
-      <div class="card">
-        <div class="path">${data.path.join(' → ')}</div>
-        <div class="fw-name">${data.framework_name}${lowBadge}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${confPct}%"></div></div>
-        <div class="rationale">${data.rationale}</div>
-        <div class="meta">
-          symptom: ${data.abstraction.symptom}<br/>
-          reproducibility: ${data.abstraction.reproducibility} &middot;
-          goal: ${data.abstraction.goal_shape} &middot;
-          evidence: ${data.abstraction.evidence_available.join(', ') || 'none'}
-          ${data.cache_hit ? '<br/>(served from path cache)' : ''}
-        </div>
-      </div>`;
+    renderResult(data);
   } catch (e) {
-    logLine(`✗ ${e}`);
-    resultEl.innerHTML = `<div class="card error">Request failed: ${e}</div>`;
+    logLine(String(e), 'err');
+    resultEl.innerHTML = `<div class="result-error">Request failed — ${escapeHtml(String(e))}</div>`;
   } finally {
     btn.disabled = false;
-    btn.textContent = "Get framework";
+    btn.textContent = "Run the key";
   }
 });
 
-// --- API guide panel -----------------------------------------------------
+function renderResult(data) {
+  const resultEl = document.getElementById('result');
+  const a = data.abstraction;
+  const confPct = Math.round(data.confidence * 100);
+  const evidence = a.evidence_available.join(', ') || 'none';
+
+  // descent rungs from path
+  const rungs = data.path.map((step, i) => {
+    const terminal = i === data.path.length - 1;
+    return `
+      <li class="rung${terminal ? ' terminal' : ''}" style="animation-delay:${0.25 + i * 0.12}s">
+        <span class="rn">${terminal ? 'framework' : (i === 0 ? 'branch' : 'level ' + i)}</span>
+        <span class="rlabel">${escapeHtml(step)}</span>
+      </li>`;
+  }).join('');
+
+  const lowNote = data.low_confidence
+    ? `<div class="low-note">low confidence — the match was ambiguous</div>` : '';
+  const cacheNote = data.cache_hit
+    ? ` · served from path cache` : '';
+
+  resultEl.innerHTML = `
+    <div class="readout">
+      <div class="intake" id="intake-panel">
+        <div class="cap">Problem shape</div>
+        <div class="field"><dt>symptom</dt><dd>${escapeHtml(a.symptom)}</dd></div>
+        <div class="field"><dt>reproducibility</dt><dd>${escapeHtml(a.reproducibility)}</dd></div>
+        <div class="field"><dt>evidence</dt><dd>${escapeHtml(evidence)}</dd></div>
+        <div class="field"><dt>goal shape</dt><dd>${escapeHtml(a.goal_shape)}</dd></div>
+      </div>
+      <div class="descent">
+        <div class="cap">Key descent</div>
+        <ol class="path">${rungs}</ol>
+        <div class="verdict">
+          <div class="conf-row">
+            <span class="lbl">Confidence</span>
+            <span class="val">${confPct}%${escapeHtml(cacheNote)}</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill${data.low_confidence ? ' low' : ''}" id="conf-fill"></div></div>
+          ${lowNote}
+          <div class="rationale">${escapeHtml(data.rationale)}</div>
+        </div>
+      </div>
+    </div>`;
+
+  // trigger reveal + confidence fill after layout
+  requestAnimationFrame(() => {
+    document.getElementById('intake-panel').classList.add('reveal');
+    const fill = document.getElementById('conf-fill');
+    if (fill) fill.style.width = confPct + '%';
+  });
+  resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// --- Appendix toggles ----------------------------------------------------
 document.getElementById('guide-btn').addEventListener('click', () => {
   const panel = document.getElementById('guide-panel');
   const showing = panel.style.display === 'block';
+  document.getElementById('addfw-panel').style.display = 'none';
   panel.style.display = showing ? 'none' : 'block';
   if (!showing) {
     document.getElementById('curl-retrieve').textContent =
@@ -375,13 +781,16 @@ document.getElementById('guide-btn').addEventListener('click', () => {
     document.getElementById('curl-frameworks-delete').textContent =
 `curl -X DELETE ${BASE}/frameworks/fw.rubber_duck_debugging \\
   -H "X-API-Key: ${API_KEY}"`;
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 });
 
-// --- Add framework panel ---------------------------------------------------
 document.getElementById('addfw-btn').addEventListener('click', () => {
   const panel = document.getElementById('addfw-panel');
-  panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+  const showing = panel.style.display === 'block';
+  document.getElementById('guide-panel').style.display = 'none';
+  panel.style.display = showing ? 'none' : 'block';
+  if (!showing) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 });
 
 document.getElementById('fw-submit').addEventListener('click', async () => {
@@ -392,19 +801,19 @@ document.getElementById('fw-submit').addEventListener('click', async () => {
   const conditions = document.getElementById('fw-conditions').value
     .split('\n').map(s => s.trim()).filter(Boolean);
   if (!name || !parent) {
-    statusEl.innerHTML = '<div class="error">Name and parent are required.</div>';
+    statusEl.innerHTML = '<span class="error">Name and parent are both required.</span>';
     return;
   }
   try {
     const fw = await apiPost('/frameworks', {
       name, branch, parent, applicability_condition: conditions
     });
-    statusEl.innerHTML = `<div class="fw-added">Added "${fw.name}" as ${fw.status} (confidence ${fw.confidence.toFixed(2)}).</div>`;
+    statusEl.innerHTML = `<div class="fw-added">Added “${escapeHtml(fw.name)}” as ${fw.status} (confidence ${fw.confidence.toFixed(2)}).</div>`;
     document.getElementById('fw-name').value = '';
     document.getElementById('fw-conditions').value = '';
     loadFrameworks();
   } catch (e) {
-    statusEl.innerHTML = `<div class="error">${e}</div>`;
+    statusEl.innerHTML = `<span class="error">${escapeHtml(String(e))}</span>`;
   }
 });
 
