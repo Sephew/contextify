@@ -796,18 +796,16 @@ document.getElementById('submit').addEventListener('click', async () => {
   logEl.innerHTML = "";
   logEl.style.display = 'block';
 
-  const context = attachedRepo
-    ? `${input}\n\nReference repository: ${attachedRepo}`
-    : input;
+  const payload = attachedRepo ? { raw_input: input, repo_url: attachedRepo } : { raw_input: input };
 
   try {
-    if (attachedRepo) logLine(`appended repository to context — ${attachedRepo}`);
+    if (attachedRepo) logLine(`reading repository files as context — ${attachedRepo}`);
     logLine("reducing the problem to its shape (abstraction)…");
-    const a = await apiPost('/abstract', { raw_input: context });
+    const a = await apiPost('/abstract', payload);
     logLine(`shape read — symptom="${a.symptom}" · reproducibility=${a.reproducibility} · goal=${a.goal_shape} · evidence=[${a.evidence_available.join(', ') || 'none'}]`, 'done');
 
     logLine("walking the framework tree across the Debugging + Testing branches…");
-    const data = await apiPost('/retrieve', { raw_input: context });
+    const data = await apiPost('/retrieve', payload);
     logLine("terminal framework reached", 'done');
 
     renderResult(data, input);

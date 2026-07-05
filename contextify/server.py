@@ -24,6 +24,7 @@ from .framework_store import new_provisional_framework
 from .llm import LLMClient, MockLLMClient, OpenRouterClient
 from .models import Branch, Framework, FrameworkMatch, ReflectionResult
 from .problem_abstraction import abstract as _abstract
+from .repo_context import repo_context_block
 
 load_dotenv()
 
@@ -47,6 +48,7 @@ def _choose_client() -> LLMClient:
 class RetrieveRequest(BaseModel):
     raw_input: str
     problem_id: str | None = None
+    repo_url: str | None = None
 
 
 class ReflectRequest(BaseModel):
@@ -56,6 +58,20 @@ class ReflectRequest(BaseModel):
 
 class AbstractRequest(BaseModel):
     raw_input: str
+    repo_url: str | None = None
+
+
+async def _enrich(raw_input: str, repo_url: str | None) -> str:
+    """Append a digest of the repo's files to the problem context, if given.
+
+    Reads the repo server-side (GitHub API) rather than passing the LLM a bare
+    URL it can't open. Silently no-ops when repo_url is empty or unreadable
+    (non-GitHub, private, missing, rate-limited).
+    """
+    if not repo_url:
+        return raw_input
+    block = await repo_context_block(repo_url)
+    return f"{raw_input}\n\n{block}" if block else raw_input
 
 
 class SolveRequest(BaseModel):
@@ -120,8 +136,9 @@ def _reflection_to_dict(result: ReflectionResult) -> dict:
 @app.post("/retrieve", dependencies=[Depends(_require_api_key)])
 async def retrieve(req: RetrieveRequest) -> dict:
     try:
+        raw_input = await _enrich(req.raw_input, req.repo_url)
         match = await aretrieve_framework(
-            req.raw_input, llm=_choose_client(), problem_id=req.problem_id
+            raw_input, llm=_choose_client(), problem_id=req.problem_id
         )
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
@@ -147,7 +164,7 @@ async def abstract_endpoint(req: AbstractRequest) -> dict:
     accepted demo-only tradeoff, not how a real integration should call this.
     """
     try:
-        result = _abstract(req.raw_input, _choose_client())
+        result = _abstract(await _enrich(req.raw_input, req.repo_url), _choose_client())
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     return {
