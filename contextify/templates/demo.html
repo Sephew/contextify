@@ -188,14 +188,29 @@
   button.run::after { content: "↳"; font-size: 1.05em; opacity: 0.8; }
   button.run:hover { background: var(--blue); }
   button.run:disabled { background: var(--ink-3); cursor: default; }
-  a.cite {
+  button.cite {
     font-family: "IBM Plex Sans", sans-serif; font-weight: 600; font-size: 0.95rem;
-    color: var(--ink); text-decoration: none; border: 1px solid var(--ink-3);
+    background: none; color: var(--ink); border: 1px solid var(--ink-3);
     padding: 0.68rem 1.2rem; border-radius: 4px; cursor: pointer;
     display: inline-flex; align-items: center; gap: 0.5rem; transition: border-color .15s, color .15s;
   }
-  a.cite::before { content: "❝"; font-size: 1.05em; opacity: 0.7; }
-  a.cite:hover { border-color: var(--ink); color: var(--blue); }
+  button.cite::before { content: "+"; font-size: 1.1em; opacity: 0.7; }
+  button.cite:hover { border-color: var(--ink); color: var(--blue); }
+  .repo-attached {
+    display: flex; align-items: center; gap: 0.55rem; margin-top: 0.85rem;
+    font-family: "IBM Plex Mono", monospace; font-size: 0.78rem;
+  }
+  .repo-attached .repo-label {
+    text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.66rem;
+    color: var(--ink-3); border: 1px solid var(--ink-3); padding: 0.12rem 0.4rem; border-radius: 3px;
+  }
+  .repo-attached .repo-url { color: var(--blue); text-decoration: none; word-break: break-all; }
+  .repo-attached .repo-url:hover { text-decoration: underline; }
+  .repo-attached .repo-clear {
+    background: none; border: none; color: var(--ink-3); cursor: pointer;
+    font-size: 0.8rem; line-height: 1; padding: 0.15rem;
+  }
+  .repo-attached .repo-clear:hover { color: var(--ink); }
 
   /* ---- trace strip ---------------------------------------------------- */
   #log {
@@ -537,7 +552,12 @@
           </div>
           <div class="console-actions">
             <button class="run" id="submit">Find the framework</button>
-            <a class="cite" href="https://github.com/Sephew/contextify" target="_blank" rel="noopener">Cite repository</a>
+            <button type="button" class="cite" id="attach-repo">Append repository</button>
+          </div>
+          <div class="repo-attached" id="repo-attached" hidden>
+            <span class="repo-label">context repo</span>
+            <a class="repo-url" id="repo-url" href="#" target="_blank" rel="noopener"></a>
+            <button type="button" class="repo-clear" id="repo-clear" title="Remove">✕</button>
           </div>
         </div>
       </div>
@@ -723,6 +743,35 @@ document.querySelectorAll('.examples button').forEach(b => {
   });
 });
 
+// --- Append repository to context ---------------------------------------
+let attachedRepo = null;
+
+function renderAttachedRepo() {
+  const wrap = document.getElementById('repo-attached');
+  const link = document.getElementById('repo-url');
+  if (attachedRepo) {
+    link.textContent = attachedRepo;
+    link.href = attachedRepo;
+    wrap.hidden = false;
+  } else {
+    wrap.hidden = true;
+  }
+}
+
+document.getElementById('attach-repo').addEventListener('click', () => {
+  const current = attachedRepo || 'https://';
+  const url = (prompt('Repository URL to append to the problem context:', current) || '').trim();
+  if (!url) return;
+  if (!/^https?:\/\/.+/.test(url)) { alert('Enter a full URL starting with http(s)://'); return; }
+  attachedRepo = url;
+  renderAttachedRepo();
+});
+
+document.getElementById('repo-clear').addEventListener('click', () => {
+  attachedRepo = null;
+  renderAttachedRepo();
+});
+
 // --- Trace log -----------------------------------------------------------
 function logLine(text, cls = '') {
   const logEl = document.getElementById('log');
@@ -747,13 +796,18 @@ document.getElementById('submit').addEventListener('click', async () => {
   logEl.innerHTML = "";
   logEl.style.display = 'block';
 
+  const context = attachedRepo
+    ? `${input}\n\nReference repository: ${attachedRepo}`
+    : input;
+
   try {
+    if (attachedRepo) logLine(`appended repository to context — ${attachedRepo}`);
     logLine("reducing the problem to its shape (abstraction)…");
-    const a = await apiPost('/abstract', { raw_input: input });
+    const a = await apiPost('/abstract', { raw_input: context });
     logLine(`shape read — symptom="${a.symptom}" · reproducibility=${a.reproducibility} · goal=${a.goal_shape} · evidence=[${a.evidence_available.join(', ') || 'none'}]`, 'done');
 
     logLine("walking the framework tree across the Debugging + Testing branches…");
-    const data = await apiPost('/retrieve', { raw_input: input });
+    const data = await apiPost('/retrieve', { raw_input: context });
     logLine("terminal framework reached", 'done');
 
     renderResult(data, input);
