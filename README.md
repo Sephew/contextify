@@ -12,6 +12,42 @@ similarity.
 Full design context: [`framework-retrieval-system.md`](framework-retrieval-system.md),
 glossary in [`CONTEXT.md`](CONTEXT.md).
 
+## Why memory infrastructure is its own sector
+
+LLMs are stateless. Every call starts from zero — no memory of past problems,
+past decisions, or what actually worked. The industry's first answer was RAG:
+embed documents, retrieve the nearest chunks, stuff them in the prompt. That
+retrieves *similar text*. It does not retrieve *structure* — how entities
+relate, what caused what, which approach was validated and which was abandoned.
+
+**Memory infrastructure** (the sector Cognee sits in) is the layer that gives
+agents a persistent, queryable, relational memory instead of a bag of chunks.
+It matters because:
+
+- **Agents need continuity, not recall.** A useful agent remembers that it
+  already tried approach X and it failed — a relationship between problem and
+  outcome, not a similar-looking paragraph. That's a graph, not a vector list.
+- **Knowledge is relational.** Real reasoning traverses connections (cause →
+  effect, problem → framework → result). A knowledge graph makes those edges
+  first-class and traversable; pure vector search flattens them away.
+- **Write-back closes the loop.** Systems that improve need to record outcomes
+  and feed them into the next retrieval. Memory infrastructure treats writing
+  learned facts back as a core operation, not an afterthought.
+- **It's the missing OS layer for agents.** Compute (models) and tools (MCP,
+  function calling) are commoditizing fast; durable, structured memory is the
+  differentiator that turns a one-shot chatbot into an agent that compounds
+  what it learns.
+
+Cognee provides this as a library: it builds a knowledge graph + vector store
+over your data and exposes `remember()` / `recall()` to write and query it.
+
+**Where this project fits.** Contextify is a concrete use case for that sector:
+a memory that stores *reasoning frameworks* (ways of thinking) as a graph, and
+`reflect()` writes outcomes back so retrieval gets better with use — exactly the
+continuity-and-write-back loop generic RAG can't express. See the
+[Framework Store](#framework-store-a-finding-worth-knowing) section for how the
+Cognee-backed store is wired in.
+
 ## Setup
 
 ```bash
@@ -93,3 +129,7 @@ per-query vector ranking.
   robustly but isn't infallible either — it also missed a narrow pair
   (deterministic-but-environment-specific vs. self-resolving-stale-data) that is
   a genuine schema-expressiveness edge, not a bug.
+
+## License
+
+[MIT](LICENSE) © 2026 sephew
