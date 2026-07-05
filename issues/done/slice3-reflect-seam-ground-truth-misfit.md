@@ -1,6 +1,6 @@
 # Slice 3 — reflect seam: ground truth + lagging misfit + tree-distance severity
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 

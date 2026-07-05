@@ -1,8 +1,10 @@
 # Contextify
 
 A Framework Retrieval System: retrieve the right *way of thinking* about a
-problem (a reasoning framework), not similar facts. This is the v1 slice —
-**Debugging branch only** (Slice 1 / upstream issue 02).
+problem (a reasoning framework), not similar facts. Slices 1-3 are built:
+both the **Debugging** and **Testing** branches, single-call branch+leaf
+resolution with a leading misfit signal, and the `reflect()` write-back seam
+(ground truth, confidence updates, lagging misfit, tree-distance severity).
 
 Full design context: [`.scratch/framework-retrieval-system/PRD.md`](.scratch/framework-retrieval-system/PRD.md),
 [`framework-retrieval-system.md`](framework-retrieval-system.md), glossary in
@@ -48,9 +50,13 @@ network/LLM/embedding calls); it self-skips unless `OPENROUTER_API_KEY` is set.
 - `framework_store/` — the persistent tree retrieval reads from. See below.
 - `retrieval/` — resolves the abstracted problem to a `FrameworkMatch`, one LLM
   call over the whole (small) tree.
-- `reflection/` — the write-back seam. **Stubbed** in this slice; lands later.
-- `api.py` — the two public seams: `retrieve_framework()` (built) and
-  `reflect()` (stub).
+- `reflection/` — the write-back seam: `reflect(match_id, outcome)` checks a
+  branch-specific ground truth (Debugging: repro pass/fail; Testing: mutation
+  caught / coverage delta), strengthens/weakens the matched Framework's
+  confidence, and detects the lagging misfit signal (3+ distinct Frameworks
+  tried for the same problem) with tree-distance severity.
+- `api.py` — the two public seams: `retrieve_framework()` and `reflect()`,
+  both built, with async (`aretrieve_framework`/`areflect`) and sync facades.
 
 ### Framework Store: a finding worth knowing
 
@@ -74,18 +80,20 @@ single-call resolver — not per-query vector ranking.
 
 ## Fixtures
 
-`tests/test_upstream_fixtures.py` ports the 12 Debugging-branch cases from the
-canonical Slice 01 spike fixture set (`spikes/cognee-retrieval-quality/fixtures.py`)
-and runs each raw_text through this package's actual `retrieve_framework()` seam
-(not Cognee vector search — this slice's retrieval mechanism is a single LLM call
-over the whole tree). `tests/fixtures.py` holds additional hand-authored
-adversarial cases (false friends / disguised twins) covering the same three
-frameworks plus the extra Trace/Instrumentation leaf.
+`tests/test_upstream_fixtures.py` ports all 20 cases (12 Debugging + 8 Testing)
+from the canonical Slice 0 spike fixture set
+(`spikes/cognee-retrieval-quality/fixtures.py`) and runs each raw_text through
+this package's actual `retrieve_framework()` seam (not Cognee vector search —
+this slice's retrieval mechanism is a single LLM call over the whole tree).
+`tests/fixtures.py` holds additional hand-authored adversarial cases (false
+friends / disguised twins). `tests/test_misfit.py` and `tests/test_reflect.py`
+cover the leading/lagging misfit signals and the reflection write-back
+respectively.
 
-## Known gaps (out of scope for this slice)
+## Known gaps (out of scope so far)
 
-- `reflect()` — write-back, ground-truth checks, provisional→trusted promotion.
-- Testing branch, leading/lagging misfit signals, path caching.
+- Human-in-the-loop promotion gate for provisional frameworks (Slice 4).
+- Path caching for repeated/similar problem schemas (Slice 5).
 - The 4-field abstraction schema is a first-cut hypothesis (per the PRD), not a
   fully solved classifier — `MockLLMClient`'s heuristic needed several rounds of
   real fixes (not fixture rewording) against the upstream + hand-authored
