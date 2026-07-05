@@ -17,9 +17,13 @@ from fastapi.responses import HTMLResponse
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 
-from .api import areflect, aretrieve_framework
+import re
+
+from .api import _get_default_store, areflect, aretrieve_framework
+from .framework_store import new_provisional_framework
 from .llm import LLMClient, MockLLMClient, OpenRouterClient
-from .models import FrameworkMatch, ReflectionResult
+from .models import Branch, Framework, FrameworkMatch, ReflectionResult
+from .problem_abstraction import abstract as _abstract
 
 load_dotenv()
 
@@ -50,6 +54,17 @@ class ReflectRequest(BaseModel):
     outcome: str
 
 
+class AbstractRequest(BaseModel):
+    raw_input: str
+
+
+class NewFrameworkRequest(BaseModel):
+    name: str
+    branch: str
+    parent: str
+    applicability_condition: list[str] = []
+
+
 def _match_to_dict(match: FrameworkMatch) -> dict:
     return {
         "match_id": match.match_id,
@@ -66,6 +81,18 @@ def _match_to_dict(match: FrameworkMatch) -> dict:
             "evidence_available": [e.value for e in match.abstraction.evidence_available],
             "goal_shape": match.abstraction.goal_shape.value,
         },
+    }
+
+
+def _framework_to_dict(f: Framework) -> dict:
+    return {
+        "id": f.id,
+        "name": f.name,
+        "branch": f.branch.value,
+        "parent": f.parent,
+        "status": f.status.value,
+        "confidence": f.confidence,
+        "applicability_condition": f.applicability_condition,
     }
 
 
@@ -102,6 +129,71 @@ async def reflect_endpoint(req: ReflectRequest) -> dict:
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     return _reflection_to_dict(result)
+
+
+@app.post("/abstract", dependencies=[Depends(_require_api_key)])
+async def abstract_endpoint(req: AbstractRequest) -> dict:
+    """Runs only the Problem Abstraction stage (stage 1 of retrieve_framework).
+
+    Exposed separately so the demo UI can show a real intermediate step while
+    waiting on /retrieve, instead of a single opaque round trip. Costs a
+    second LLM call when the UI then calls /retrieve right after — an
+    accepted demo-only tradeoff, not how a real integration should call this.
+    """
+    try:
+        result = _abstract(req.raw_input, _choose_client())
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {
+        "symptom": result.symptom,
+        "reproducibility": result.reproducibility.value,
+        "evidence_available": [e.value for e in result.evidence_available],
+        "goal_shape": result.goal_shape.value,
+    }
+
+
+@app.get("/frameworks", dependencies=[Depends(_require_api_key)])
+async def list_frameworks() -> list[dict]:
+    store = await _get_default_store()
+    tree = await store.read_tree()
+    return [_framework_to_dict(f) for f in tree]
+
+
+@app.post("/frameworks", dependencies=[Depends(_require_api_key)])
+async def add_framework(req: NewFrameworkRequest) -> dict:
+    """Registers a new provisional Framework (PRD promotion gate) — the demo's
+    "generate a new framework" flow. This does not use an LLM to author the
+    Framework; it's the human-in-the-loop path already in
+    contextify.framework_store.new_provisional_framework, just reachable over
+    HTTP for the demo. The new node starts PROVISIONAL / under-weighted and
+    only reaches trusted status via reflect()'s promotion gate.
+    """
+    try:
+        branch = Branch(req.branch)
+    except ValueError as exc:
+        raise HTTPException(
+            400, f"unknown branch {req.branch!r}; expected one of {[b.value for b in Branch]}"
+        ) from exc
+
+    store = await _get_default_store()
+    parent = await store.get(req.parent)
+    if parent is None:
+        raise HTTPException(400, f"unknown parent framework id {req.parent!r}")
+
+    slug = re.sub(r"[^a-z0-9]+", "_", req.name.lower()).strip("_")
+    framework_id = f"fw.{slug}"
+    if await store.get(framework_id) is not None:
+        raise HTTPException(409, f"a framework with id {framework_id!r} already exists")
+
+    framework = new_provisional_framework(
+        id=framework_id,
+        name=req.name,
+        branch=branch,
+        parent=req.parent,
+        applicability_condition=req.applicability_condition,
+    )
+    await store.seed([framework])
+    return _framework_to_dict(framework)
 
 
 _DEMO_TEMPLATE = Path(__file__).parent / "templates" / "demo.html"

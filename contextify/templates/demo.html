@@ -8,22 +8,33 @@
   :root { color-scheme: light dark; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    max-width: 720px; margin: 0 auto; padding: 2.5rem 1.5rem;
+    max-width: 780px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem;
     background: #0f172a; color: #e2e8f0;
   }
-  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
-  p.sub { color: #94a3b8; margin-top: 0; margin-bottom: 2rem; font-size: 0.9rem; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; display: inline-block; }
+  h2 { font-size: 1rem; color: #cbd5e1; margin: 0 0 0.75rem 0; }
+  p.sub { color: #94a3b8; margin-top: 0; margin-bottom: 1.5rem; font-size: 0.9rem; }
+  .top-row { display: flex; justify-content: space-between; align-items: baseline; }
+  section { margin-top: 2.25rem; }
   textarea {
     width: 100%; min-height: 120px; box-sizing: border-box;
     background: #1e293b; color: #e2e8f0; border: 1px solid #334155;
     border-radius: 8px; padding: 0.75rem; font-size: 0.95rem; resize: vertical;
+    font-family: inherit;
   }
+  input, select {
+    background: #1e293b; color: #e2e8f0; border: 1px solid #334155;
+    border-radius: 6px; padding: 0.5rem 0.6rem; font-size: 0.9rem;
+    box-sizing: border-box; font-family: inherit;
+  }
+  label { display: block; font-size: 0.8rem; color: #94a3b8; margin: 0.75rem 0 0.25rem; }
   button {
-    margin-top: 0.75rem; background: #4f46e5; color: white; border: none;
-    padding: 0.6rem 1.4rem; border-radius: 6px; font-size: 0.95rem; cursor: pointer;
+    background: #4f46e5; color: white; border: none;
+    padding: 0.55rem 1.3rem; border-radius: 6px; font-size: 0.9rem; cursor: pointer;
   }
+  button.ghost { background: transparent; border: 1px solid #475569; color: #cbd5e1; }
   button:disabled { background: #475569; cursor: default; }
-  #result { margin-top: 2rem; }
+  #result { margin-top: 1.25rem; }
   .card {
     background: #1e293b; border: 1px solid #334155; border-radius: 10px;
     padding: 1.25rem 1.5rem;
@@ -31,10 +42,12 @@
   .path { color: #94a3b8; font-size: 0.85rem; margin-bottom: 0.25rem; }
   .fw-name { font-size: 1.3rem; font-weight: 600; margin: 0 0 0.5rem 0; }
   .badge {
-    display: inline-block; font-size: 0.75rem; padding: 0.15rem 0.55rem;
+    display: inline-block; font-size: 0.7rem; padding: 0.15rem 0.55rem;
     border-radius: 999px; margin-left: 0.5rem; vertical-align: middle;
   }
   .badge.low { background: #7c2d12; color: #fed7aa; }
+  .badge.provisional { background: #422006; color: #fde68a; }
+  .badge.seeded { background: #1e3a5f; color: #93c5fd; }
   .rationale { color: #cbd5e1; margin-top: 0.75rem; line-height: 1.5; }
   .meta { margin-top: 1rem; font-size: 0.8rem; color: #64748b; }
   .bar-track { background: #334155; border-radius: 999px; height: 6px; margin-top: 0.75rem; overflow: hidden; }
@@ -45,51 +58,191 @@
     background: #1e293b; border: 1px solid #334155; color: #94a3b8;
     padding: 0.3rem 0.6rem; font-size: 0.75rem; margin: 0.25rem 0.35rem 0 0; border-radius: 999px;
   }
+  #log {
+    display: none; font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.8rem; color: #94a3b8; background: #1e293b; border: 1px solid #334155;
+    border-radius: 8px; padding: 0.75rem 1rem; margin-top: 1rem; white-space: pre-wrap;
+  }
+  #log .line { margin: 0.15rem 0; }
+  #log .line.done { color: #6ee7b7; }
+  .tree { display: flex; flex-direction: column; gap: 0.4rem; }
+  .branch-group { margin-bottom: 0.75rem; }
+  .branch-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 0.4rem; }
+  .fw-row {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #1e293b; border: 1px solid #334155; border-radius: 6px;
+    padding: 0.5rem 0.75rem; font-size: 0.85rem;
+  }
+  .fw-row + .fw-row { margin-top: 0.35rem; }
+  .fw-row .name { font-weight: 500; }
+  .fw-row .conf { color: #64748b; font-size: 0.75rem; }
+  #guide-panel, #addfw-panel {
+    display: none; margin-top: 1rem; background: #1e293b; border: 1px solid #334155;
+    border-radius: 8px; padding: 1rem 1.25rem;
+  }
+  pre.curl {
+    background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+    padding: 0.75rem; font-size: 0.75rem; overflow-x: auto; color: #a5b4fc;
+    margin: 0.4rem 0 1rem;
+  }
+  .fw-added { color: #6ee7b7; font-size: 0.85rem; margin-top: 0.6rem; }
 </style>
 </head>
 <body>
-  <h1>Contextify</h1>
+  <div class="top-row">
+    <h1>Contextify</h1>
+    <button class="ghost" id="guide-btn" type="button">API Guide</button>
+  </div>
   <p class="sub">Retrieve the right reasoning framework for a problem — not similar code, the correct way of thinking about it. Covers the Debugging and Testing branches.</p>
 
-  <textarea id="input" placeholder="Describe a bug, or a testing concern — e.g. &quot;Tests fail intermittently on CI only, pass locally, no stack trace&quot;"></textarea>
-  <div class="examples">
-    <button type="button" data-ex="Users report the page crashes sometimes but I can never reproduce it locally, no stack trace available.">Example: flaky crash</button>
-    <button type="button" data-ex="I want to make sure my new date-parsing function is well tested before merging, need good test coverage.">Example: test coverage</button>
-    <button type="button" data-ex="This worked yesterday and now every request returns stale data until I restart the server.">Example: stale data</button>
-  </div>
-  <br/>
-  <button id="submit">Get framework</button>
+  <div id="guide-panel">
+    <h2>Using the API directly</h2>
+    <p style="font-size:0.85rem;color:#94a3b8;margin-top:0;">This page is a demo only. Everything below hits the same hosted API, with your key already filled in.</p>
 
-  <div id="result"></div>
+    <div>POST /retrieve</div>
+    <pre class="curl" id="curl-retrieve"></pre>
+
+    <div>POST /reflect (record a real-world outcome against a match_id)</div>
+    <pre class="curl" id="curl-reflect"></pre>
+
+    <div>GET /frameworks (list the current tree)</div>
+    <pre class="curl" id="curl-frameworks"></pre>
+  </div>
+
+  <section>
+    <h2>Available frameworks</h2>
+    <div class="tree" id="frameworks-tree">
+      <div style="color:#64748b;font-size:0.85rem;">loading...</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Get a framework for a problem</h2>
+    <textarea id="input" placeholder="Describe a bug, or a testing concern — e.g. &quot;Tests fail intermittently on CI only, pass locally, no stack trace&quot;"></textarea>
+    <div class="examples">
+      <button type="button" data-ex="Users report the page crashes sometimes but I can never reproduce it locally, no stack trace available.">Example: flaky crash</button>
+      <button type="button" data-ex="I want to make sure my new date-parsing function is well tested before merging, need good test coverage.">Example: test coverage</button>
+      <button type="button" data-ex="This worked yesterday and now every request returns stale data until I restart the server.">Example: stale data</button>
+    </div>
+    <br/>
+    <button id="submit">Get framework</button>
+
+    <div id="log"></div>
+    <div id="result"></div>
+  </section>
+
+  <section>
+    <h2>Add a new framework <span style="font-weight:400;color:#64748b;font-size:0.8rem;">(enters as provisional, per the promotion gate)</span></h2>
+    <button class="ghost" id="addfw-btn" type="button">+ New framework</button>
+    <div id="addfw-panel">
+      <label for="fw-name">Name</label>
+      <input id="fw-name" placeholder="e.g. Rubber Duck Debugging" style="width:100%;" />
+      <label for="fw-branch">Branch</label>
+      <select id="fw-branch" style="width:100%;">
+        <option value="debugging">Debugging</option>
+        <option value="testing">Testing</option>
+      </select>
+      <label for="fw-parent">Parent framework id</label>
+      <select id="fw-parent" style="width:100%;"></select>
+      <label for="fw-conditions">Applicability condition (one per line)</label>
+      <textarea id="fw-conditions" style="min-height:70px;" placeholder="reproducibility: deterministic&#10;evidence_available: report_only"></textarea>
+      <br/><br/>
+      <button id="fw-submit">Add framework</button>
+      <div id="fw-status"></div>
+    </div>
+  </section>
 
 <script>
 const API_KEY = "__API_KEY__";
+const BASE = window.location.origin;
 
+async function apiGet(path) {
+  const res = await fetch(BASE + path, { headers: { 'X-API-Key': API_KEY } });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || res.status);
+  return data;
+}
+async function apiPost(path, body) {
+  const res = await fetch(BASE + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || res.status);
+  return data;
+}
+
+// --- Frameworks list ---------------------------------------------------
+async function loadFrameworks() {
+  const treeEl = document.getElementById('frameworks-tree');
+  try {
+    const frameworks = await apiGet('/frameworks');
+    const branches = {};
+    frameworks.forEach(f => {
+      (branches[f.branch] = branches[f.branch] || []).push(f);
+    });
+    treeEl.innerHTML = Object.entries(branches).map(([branch, items]) => `
+      <div class="branch-group">
+        <div class="branch-title">${branch}</div>
+        ${items.filter(f => f.parent !== null).map(f => `
+          <div class="fw-row">
+            <span class="name">${f.name}</span>
+            <span>
+              <span class="conf">conf ${f.confidence.toFixed(2)}</span>
+              <span class="badge ${f.status}">${f.status}</span>
+            </span>
+          </div>`).join('')}
+      </div>`).join('');
+    populateParentSelect(frameworks);
+  } catch (e) {
+    treeEl.innerHTML = `<div class="error">Could not load frameworks: ${e}</div>`;
+  }
+}
+
+function populateParentSelect(frameworks) {
+  const sel = document.getElementById('fw-parent');
+  const roots = frameworks.filter(f => f.parent === null);
+  sel.innerHTML = roots.map(f => `<option value="${f.id}">${f.name} (${f.id})</option>`).join('');
+}
+
+// --- Example buttons -----------------------------------------------------
 document.querySelectorAll('.examples button').forEach(b => {
   b.addEventListener('click', () => { document.getElementById('input').value = b.dataset.ex; });
 });
 
+// --- Get framework, with a real 2-step log ------------------------------
+function logLine(text, done = false) {
+  const logEl = document.getElementById('log');
+  logEl.style.display = 'block';
+  const div = document.createElement('div');
+  div.className = 'line' + (done ? ' done' : '');
+  div.textContent = text;
+  logEl.appendChild(div);
+}
+
 document.getElementById('submit').addEventListener('click', async () => {
   const input = document.getElementById('input').value.trim();
   const resultEl = document.getElementById('result');
+  const logEl = document.getElementById('log');
   const btn = document.getElementById('submit');
-  if (!input) { return; }
+  if (!input) return;
 
   btn.disabled = true;
   btn.textContent = "Thinking...";
   resultEl.innerHTML = "";
+  logEl.innerHTML = "";
+  logEl.style.display = 'block';
 
   try {
-    const res = await fetch('/retrieve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
-      body: JSON.stringify({ raw_input: input })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      resultEl.innerHTML = `<div class="card error">Error: ${data.detail || res.status}</div>`;
-      return;
-    }
+    logLine("→ sending problem to LLM for Problem Abstraction...");
+    const abstraction = await apiPost('/abstract', { raw_input: input });
+    logLine(`✓ abstracted: symptom="${abstraction.symptom}" · reproducibility=${abstraction.reproducibility} · goal=${abstraction.goal_shape} · evidence=[${abstraction.evidence_available.join(', ') || 'none'}]`, true);
+
+    logLine("→ walking the framework tree (Debugging + Testing) for the best-fit match...");
+    const data = await apiPost('/retrieve', { raw_input: input });
+    logLine("✓ match resolved", true);
+
     const confPct = Math.round(data.confidence * 100);
     const lowBadge = data.low_confidence
       ? '<span class="badge low">low confidence — ambiguous match</span>' : '';
@@ -108,12 +261,66 @@ document.getElementById('submit').addEventListener('click', async () => {
         </div>
       </div>`;
   } catch (e) {
+    logLine(`✗ ${e}`);
     resultEl.innerHTML = `<div class="card error">Request failed: ${e}</div>`;
   } finally {
     btn.disabled = false;
     btn.textContent = "Get framework";
   }
 });
+
+// --- API guide panel -----------------------------------------------------
+document.getElementById('guide-btn').addEventListener('click', () => {
+  const panel = document.getElementById('guide-panel');
+  const showing = panel.style.display === 'block';
+  panel.style.display = showing ? 'none' : 'block';
+  if (!showing) {
+    document.getElementById('curl-retrieve').textContent =
+`curl -X POST ${BASE}/retrieve \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: ${API_KEY}" \\
+  -d '{"raw_input": "tests fail intermittently on CI"}'`;
+    document.getElementById('curl-reflect').textContent =
+`curl -X POST ${BASE}/reflect \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: ${API_KEY}" \\
+  -d '{"match_id": "<match_id from /retrieve>", "outcome": "repro_now_passes"}'`;
+    document.getElementById('curl-frameworks').textContent =
+`curl ${BASE}/frameworks -H "X-API-Key: ${API_KEY}"`;
+  }
+});
+
+// --- Add framework panel ---------------------------------------------------
+document.getElementById('addfw-btn').addEventListener('click', () => {
+  const panel = document.getElementById('addfw-panel');
+  panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+});
+
+document.getElementById('fw-submit').addEventListener('click', async () => {
+  const statusEl = document.getElementById('fw-status');
+  const name = document.getElementById('fw-name').value.trim();
+  const branch = document.getElementById('fw-branch').value;
+  const parent = document.getElementById('fw-parent').value;
+  const conditions = document.getElementById('fw-conditions').value
+    .split('\n').map(s => s.trim()).filter(Boolean);
+  if (!name || !parent) {
+    statusEl.innerHTML = '<div class="error">Name and parent are required.</div>';
+    return;
+  }
+  try {
+    const fw = await apiPost('/frameworks', {
+      name, branch, parent, applicability_condition: conditions
+    });
+    statusEl.innerHTML = `<div class="fw-added">Added "${fw.name}" as ${fw.status} (confidence ${fw.confidence.toFixed(2)}).</div>`;
+    document.getElementById('fw-name').value = '';
+    document.getElementById('fw-conditions').value = '';
+    loadFrameworks();
+  } catch (e) {
+    statusEl.innerHTML = `<div class="error">${e}</div>`;
+  }
+});
+
+loadFrameworks();
 </script>
 </body>
 </html>
