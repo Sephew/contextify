@@ -4,24 +4,40 @@ The store sits *outside* the input->output line (per the design doc): retrieval
 reads the tree, reflection (later) writes back. That independent read/write is
 what lets the system accumulate judgment instead of being a fancy prompt.
 
-Two implementations behind one interface:
+Three implementations behind one interface:
 
 - :class:`InMemoryGraphStore` — a real parent/child graph held in memory. The
-  working default for this slice.
-- :class:`CogneeFrameworkStore` — a faithful adapter over Cognee's graph engine
-  (the API verified against cognee 1.2.2). It is **not** the default: cognee's
-  bundled embedded backend (Ladybug/Kuzu) ships a broken ``add_node`` query on
-  this platform, so it stays behind the interface until Cognee is pointed at a
-  working graph backend (e.g. Neo4j) or the upstream bug is fixed. Swapping is a
-  one-line change at the call site — nothing else in the system knows the
-  difference.
+  working default for this slice: no external dependency, fully offline.
+- :class:`CogneeFrameworkStore` — a direct adapter over Cognee's low-level graph
+  engine (``add_node``/``add_edge``, API verified against cognee 1.2.2). **Not
+  usable on this platform**: cognee's bundled embedded backend (Ladybug/Kuzu)
+  emits a query (``MERGE ... SET n += {map}``) its own parser rejects, so
+  ``add_node`` fails outright here. Kept behind the interface for when Cognee
+  ships a working embedded backend or points at an external one (Neo4j, etc).
+- :class:`CogneeDocumentStore` — a *working* Cognee-backed alternative,
+  verified empirically on this machine via OpenRouter. Rather than the broken
+  low-level graph API, it drives Cognee's own ingestion pipeline
+  (``cognee.add`` + ``cognee.cognify``), which internally batches its graph
+  writes through a different path that does not hit the same bug. Each
+  Framework is stored as one JSON-serialized document tagged with
+  ``node_set=[framework.id]``; ``read_tree()`` reads it back via
+  ``cognee.search(SearchType.CHUNKS)``. This is the mechanism the upstream
+  Cognee spike (``spikes/cognee-retrieval-quality/VERDICT.md``) validated with
+  a 100% top-3 / 85% top-1 result — confirming Cognee's embedding space does
+  handle this system's structural-similarity needs, given a good abstraction.
+  Requires ``OPENROUTER_API_KEY`` (real network + LLM + embedding calls); not
+  used by the default offline test suite for that reason.
 """
 
 from __future__ import annotations
 
+import json
+import logging
+import os
 import uuid
 from abc import ABC, abstractmethod
 
+from ..llm import DEFAULT_MODEL
 from ..models import Branch, Framework, FrameworkStatus
 
 
@@ -36,9 +52,13 @@ class FrameworkStore(ABC):
     async def read_tree(self) -> list[Framework]:
         """Return every node. Retrieval feeds the whole (small) tree to one call."""
 
-    @abstractmethod
     async def get(self, framework_id: str) -> Framework | None:
-        """Look up a single node by id."""
+        """Look up a single node by id. Default: linear scan over read_tree();
+        override for a faster path (see InMemoryGraphStore's dict lookup)."""
+        for f in await self.read_tree():
+            if f.id == framework_id:
+                return f
+        return None
 
 
 class InMemoryGraphStore(FrameworkStore):
@@ -151,8 +171,118 @@ class CogneeFrameworkStore(FrameworkStore):
             )
         return tree
 
-    async def get(self, framework_id: str) -> Framework | None:
-        for f in await self.read_tree():
-            if f.id == framework_id:
-                return f
-        return None
+
+class CogneeDocumentStore(FrameworkStore):
+    """Cognee-backed store via the ingestion pipeline (``add`` + ``cognify``),
+    read back through vector search. See module docstring for why this path
+    works locally when the low-level graph adapter does not.
+
+    Requires ``OPENROUTER_API_KEY`` (or another key already configured against
+    ``LLM_API_KEY``/``EMBEDDING_API_KEY``) — every operation makes real network
+    calls, so this is not used by the offline default test suite.
+    """
+
+    DATASET = "contextify_framework_store"
+
+    def __init__(self) -> None:
+        self._configured = False
+
+    def _configure_from_openrouter(self) -> None:
+        """Point cognee's LLM + embedding config at OpenRouter via its own env
+        vars (LLM_*/EMBEDDING_*), distinct from this package's OPENROUTER_API_KEY."""
+        if self._configured:
+            return
+        from dotenv import load_dotenv
+
+        load_dotenv()
+        key = os.getenv("OPENROUTER_API_KEY")
+        if not key:
+            raise RuntimeError(
+                "CogneeDocumentStore requires OPENROUTER_API_KEY (cognee needs "
+                "real LLM + embedding calls for cognify/search)."
+            )
+        endpoint = "https://openrouter.ai/api/v1"
+        os.environ.setdefault("LLM_PROVIDER", "openai")
+        os.environ.setdefault("LLM_MODEL", os.getenv("CONTEXTIFY_MODEL", DEFAULT_MODEL))
+        os.environ.setdefault("LLM_ENDPOINT", endpoint)
+        os.environ.setdefault("LLM_API_KEY", key)
+        os.environ.setdefault("EMBEDDING_PROVIDER", "openai")
+        os.environ.setdefault("EMBEDDING_MODEL", "openai/text-embedding-3-small")
+        os.environ.setdefault("EMBEDDING_ENDPOINT", endpoint)
+        os.environ.setdefault("EMBEDDING_API_KEY", key)
+        os.environ.setdefault("EMBEDDING_DIMENSIONS", "1536")
+        self._configured = True
+
+    @staticmethod
+    def _to_document(f: Framework) -> str:
+        return json.dumps(
+            {
+                "id": f.id,
+                "name": f.name,
+                "branch": f.branch.value,
+                "parent": f.parent,
+                "applicability_condition": f.applicability_condition,
+                "status": f.status.value,
+                "confidence": f.confidence,
+            }
+        )
+
+    @staticmethod
+    def _from_document(text: str) -> Framework:
+        data = json.loads(text)
+        return Framework(
+            id=data["id"],
+            name=data["name"],
+            branch=Branch(data["branch"]),
+            parent=data.get("parent"),
+            applicability_condition=list(data.get("applicability_condition", [])),
+            status=FrameworkStatus(data.get("status", "seeded")),
+            confidence=float(data.get("confidence", 1.0)),
+        )
+
+    async def seed(self, frameworks: list[Framework]) -> None:
+        self._configure_from_openrouter()
+        import cognee
+
+        # Deliberately no cognee.prune.* call here: cognee 1.2.2's prune API takes
+        # no dataset filter (prune_data()/prune_system() are global), so calling it
+        # would wipe every Cognee dataset on the machine, not just this one. Calling
+        # seed() more than once may accumulate duplicate documents in this dataset
+        # instead — an acceptable v1 tradeoff over a data-loss footgun.
+        for f in frameworks:
+            await cognee.add(
+                [self._to_document(f)], dataset_name=self.DATASET, node_set=[f.id]
+            )
+        await cognee.cognify(datasets=[self.DATASET])
+        self._seeded_ids = [f.id for f in frameworks]
+
+    async def read_tree(self) -> list[Framework]:
+        self._configure_from_openrouter()
+        import cognee
+        from cognee.modules.search.types import SearchType
+
+        seeded_ids = getattr(self, "_seeded_ids", [])
+        top_k = max(len(seeded_ids) * 2, 10)
+        results = await cognee.search(
+            query_text="software debugging framework applicability",
+            query_type=SearchType.CHUNKS,
+            datasets=[self.DATASET],
+            top_k=top_k,
+        )
+        chunks = results[0]["search_result"] if results else []
+        tree: list[Framework] = []
+        seen: set[str] = set()
+        for chunk in chunks:
+            for node_id in chunk.get("belongs_to_set") or []:
+                if node_id in seen:
+                    continue
+                try:
+                    tree.append(self._from_document(chunk["text"]))
+                    seen.add(node_id)
+                except (KeyError, ValueError, json.JSONDecodeError) as exc:
+                    logging.getLogger(__name__).warning(
+                        "CogneeDocumentStore.read_tree(): dropping unparseable "
+                        "document for node_set %r: %s", node_id, exc,
+                    )
+                    continue
+        return tree

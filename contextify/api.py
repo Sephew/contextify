@@ -43,7 +43,21 @@ def retrieve_framework(
     llm: LLMClient | None = None,
     store: FrameworkStore | None = None,
 ) -> FrameworkMatch:
-    """Synchronous facade over :func:`aretrieve_framework` for CLI/simple use."""
+    """Synchronous facade over :func:`aretrieve_framework` for CLI/simple use.
+
+    Raises RuntimeError with actionable guidance if called from inside code that's
+    already running an event loop (e.g. an async web handler, a notebook cell) —
+    use ``await aretrieve_framework(...)`` directly there instead.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        pass  # no loop running — the expected case, safe to asyncio.run()
+    else:
+        raise RuntimeError(
+            "retrieve_framework() cannot be called from inside a running event "
+            "loop. Use 'await aretrieve_framework(...)' instead."
+        )
     return asyncio.run(aretrieve_framework(raw_input, llm=llm, store=store))
 
 

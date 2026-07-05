@@ -79,7 +79,11 @@ def main(argv: list[str] | None = None) -> int:
 
     raw = " ".join(args.problem).strip() or _DEFAULT_EXAMPLE
     client, label = _choose_client(args.mock)
-    match = retrieve_framework(raw, llm=client)
+    try:
+        match = retrieve_framework(raw, llm=client)
+    except ValueError as exc:
+        print(f"[error] retrieval failed ({label}): {exc}", file=sys.stderr)
+        return 1
     print(_render(match, label))
     return 0
 

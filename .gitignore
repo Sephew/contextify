@@ -2,6 +2,12 @@
 .env
 *.key
 
+# Claude context — not tracked on the working branch (see for-claude branch)
+CLAUDE.md
+claude.md
+.claude/
+AGENTS.md
+
 # Cognee local databases / system dirs
 .cognee_system/
 .data/

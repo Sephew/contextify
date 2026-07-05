@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .seed import DEBUGGING_FRAMEWORKS
 from .store import (
+    CogneeDocumentStore,
     CogneeFrameworkStore,
     FrameworkStore,
     InMemoryGraphStore,
@@ -21,6 +22,7 @@ __all__ = [
     "FrameworkStore",
     "InMemoryGraphStore",
     "CogneeFrameworkStore",
+    "CogneeDocumentStore",
     "DEBUGGING_FRAMEWORKS",
     "build_seeded_store",
 ]

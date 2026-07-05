@@ -99,14 +99,24 @@ def _retrieval_prompt(abstraction: ProblemAbstraction, tree: list[Framework]) ->
 
 
 def _extract_json(text: str) -> dict:
-    """Pull the first JSON object out of a model response, tolerating code fences."""
-    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    """Pull the first JSON object out of a model response, tolerating code fences
+    and trailing commentary.
+
+    Uses raw_decode from the first '{' rather than slicing to the *last* '}' in the
+    text — the latter breaks the moment a response contains any trailing text with
+    its own brace (e.g. closing commentary), since it grabs everything up to that
+    unrelated brace instead of the JSON object's actual end.
+    """
+    fenced = re.search(r"```(?:json)?\s*(\{.*)\s*```", text, re.DOTALL)
     blob = fenced.group(1) if fenced else text
     start = blob.find("{")
-    end = blob.rfind("}")
-    if start == -1 or end == -1:
+    if start == -1:
         raise ValueError(f"No JSON object found in model response: {text!r}")
-    return json.loads(blob[start : end + 1])
+    try:
+        obj, _end = json.JSONDecoder().raw_decode(blob, start)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Malformed JSON in model response: {text!r}") from exc
+    return obj
 
 
 # --------------------------------------------------------------------------- #
@@ -179,7 +189,15 @@ class OpenRouterClient:
 # Keyword -> field rules for abstraction. First match wins per field; order matters.
 _REPRO_RULES = [
     (Reproducibility.INTERMITTENT, ("intermittent", "sometimes", "flaky", "randomly",
-                                    "occasionally", "once in a while", "not always")),
+                                    "occasionally", "once in a while", "not always",
+                                    # multiple unconfirmed candidate causes ("could be
+                                    # X, Y, or Z", "no clear pattern yet") is how bug
+                                    # reports usually phrase an unpinned intermittent
+                                    # trigger, without ever using the word "intermittent"
+                                    "could be", "might be", "no clear pattern",
+                                    "no obvious pattern", "not sure which",
+                                    "not sure why", "some users but not others",
+                                    "for some users", "some but not others")),
     (Reproducibility.UNREPRODUCED, ("can't reproduce", "cannot reproduce",
                                     "couldn't reproduce", "unable to reproduce",
                                     "never reproduced", "no repro")),
@@ -202,6 +220,18 @@ _NEGATORS = ("no ", "not ", "n't ", "never ", "without ", "lack of ")
 # Words that make an otherwise-positive evidence keyword merely aspirational
 # ("add logging" means it doesn't exist yet, not that evidence is in hand).
 _ASPIRATIONAL = ("add ", "adding ", "need ", "needs ", "want ", "start ", "more ")
+
+_SELF_RESOLVING_HINTS = (
+    "on its own", "by itself", "eventually", "after a delay", "after a while",
+    "over time", "corrects itself", "resolves itself", "manual refresh",
+    "manually clear", "clears the cache", "clear the cache", "log out and back in",
+    "logging out and back in", "reload the page", "refresh the page", "overnight",
+    "catches up", "correct again if",
+)
+_SELF_RESOLVING_MARKERS = (
+    "self-correct", "cache", "refresh", "reload", "restart", "clear",
+    "delay", "log out", "log back in", "relogin",
+)
 
 _GOAL_RULES = [
     (GoalShape.REGRESSION_PREVENTION, ("prevent regression", "stop it recurring",
@@ -246,7 +276,39 @@ def _resolve_reproducibility(text: str) -> Reproducibility:
     idx = lowered.find("reproduce")
     if idx != -1 and any(h in _window_before(lowered, idx, 40) for h in _UNREPRODUCED_HINTS):
         return Reproducibility.UNREPRODUCED
+    # A symptom that fixes itself via refresh/relogin/wait/cache-clear, with no code
+    # change, is definitionally not a stable "reproduces identically every run"
+    # regression — it's a transient/staleness artifact. Without this, such reports
+    # (which rarely use words like "intermittent") silently default to DETERMINISTIC,
+    # which is the one value a real regression-bisection case would want instead.
+    if any(hint in lowered for hint in _SELF_RESOLVING_HINTS):
+        return Reproducibility.INTERMITTENT
+    # "Fails consistently on environment X, works every time elsewhere" uses
+    # deterministic-sounding words ("consistently", "every time") but the actual
+    # variable is the environment, not a code change — an explicit signal that
+    # should win over the generic DETERMINISTIC keyword match above.
+    if any(
+        hint in lowered
+        for hint in ("environment-specific", "not a regression", "not a code",
+                     "nothing changed in", "no code change")
+    ):
+        return Reproducibility.INTERMITTENT
     return _first_match(text, _REPRO_RULES, Reproducibility.DETERMINISTIC)
+
+
+def _resolve_goal_shape(text: str) -> GoalShape:
+    matched = _first_match(text, _GOAL_RULES, None)
+    if matched is not None:
+        return matched
+    # A purely descriptive "stale value that fixes itself" report carries an
+    # implicit ask to make it stop happening, not a request to diagnose why two
+    # cases differ — even though no explicit goal phrase ("fix it", "root cause")
+    # appears in the text at all. Defaulting blindly to ROOT_CAUSE here is what
+    # let Bisection/Differential (whose checklists both cite root_cause) win by
+    # default over Cache Invalidation (which needs "fix") on unstated-goal reports.
+    if any(hint in text.lower() for hint in _SELF_RESOLVING_HINTS):
+        return GoalShape.FIX
+    return GoalShape.ROOT_CAUSE
 
 
 class MockLLMClient:
@@ -265,7 +327,7 @@ class MockLLMClient:
             symptom=raw_text.strip().split(".")[0][:200],
             reproducibility=_resolve_reproducibility(raw_text),
             evidence_available=[evidence],
-            goal_shape=_first_match(raw_text, _GOAL_RULES, GoalShape.ROOT_CAUSE),
+            goal_shape=_resolve_goal_shape(raw_text),
         )
 
     def resolve_framework(
@@ -310,12 +372,21 @@ class MockLLMClient:
                 score += 3
         # Light tiebreaker: rarer (>=6 char) symptom words overlapping the
         # checklist text, capped so it can never outweigh a structural field.
+        symptom_lower = abstraction.symptom.lower()
         overlap = sum(
             1
-            for word in set(re.findall(r"[a-z]{6,}", abstraction.symptom.lower()))
+            for word in set(re.findall(r"[a-z]{6,}", symptom_lower))
             if word in blob
         )
         score += min(overlap, 3)
+        # A "self-resolves via refresh/relogin/wait/cache-clear" symptom shape is a
+        # genuine structural signal for stale-data bugs — a real logic bug wouldn't
+        # spontaneously fix itself that way — but is usually phrased with short,
+        # common words the word-overlap tiebreaker above (>=6 chars) can't see.
+        if any(hint in symptom_lower for hint in _SELF_RESOLVING_HINTS) and any(
+            marker in blob for marker in _SELF_RESOLVING_MARKERS
+        ):
+            score += 4
         return score
 
 

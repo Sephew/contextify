@@ -46,10 +46,15 @@ DIFFERENTIAL = Framework(
     branch=Branch.DEBUGGING,
     parent="fw.debugging",
     applicability_condition=[
-        "reproducibility: intermittent or environment-specific behavior",
-        "works in one environment but not another (works on my machine / prod-only)",
+        "reproducibility: intermittent, or multiple plausible unconfirmed causes with "
+        "no single trigger pinned down yet (e.g. 'could be X, Y, or Z', 'no discernible "
+        "pattern yet', 'not sure which')",
+        "works in one environment but not another, or affects some users/machines but "
+        "not others on the same build (works on my machine / prod-only)",
+        "the symptom is a working case versus a failing case that otherwise look "
+        "alike, and the goal is explaining why they differ",
         "evidence: logs comparing a working case against a failing case",
-        "goal_shape: root_cause — explain the difference between the two cases",
+        "goal_shape: root_cause — rule out candidate causes to find which one is real",
     ],
     status=FrameworkStatus.SEEDED,
 )
@@ -60,10 +65,16 @@ CACHE_CHECKLIST = Framework(
     branch=Branch.DEBUGGING,
     parent="fw.debugging",
     applicability_condition=[
-        "symptom: stale or inconsistent data — an old value is served after an update",
-        "outdated content that only refreshes after a delay or manual reload",
-        "evidence: report_only or logs of a value that failed to update",
-        "goal_shape: fix — invalidate/propagate correctly so fresh data is served",
+        "symptom: stale, outdated, or old data/content is shown right after a write or "
+        "update — the value was correct before the change and wrong immediately after",
+        "the problem self-corrects on its own without further code changes: after a "
+        "delay, a manual refresh/reload, a cache clear, a restart, or logging out and "
+        "back in — the SAME data becomes fresh again with no fix applied, which is the "
+        "signature that rules out a real logic bug (a broken calculation would still "
+        "be wrong after a refresh/relogin)",
+        "evidence: report_only or logs of a value that failed to update immediately",
+        "goal_shape: fix — invalidate/propagate correctly so fresh data is served "
+        "immediately, without needing a delay/refresh/relogin workaround",
     ],
     status=FrameworkStatus.SEEDED,
 )
