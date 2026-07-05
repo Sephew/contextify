@@ -9,6 +9,8 @@ cognee_data/
 *.db
 *.sqlite
 *.sqlite3
+dev.db
+test.db
 
 # Python
 __pycache__/
@@ -23,6 +25,10 @@ env/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+
+# Node
+node_modules/
+.vite/
 
 # Editor / OS
 .DS_Store
