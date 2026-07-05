@@ -1,0 +1,31 @@
+[project]
+name = "contextify"
+version = "0.1.0"
+description = "Framework Retrieval System — retrieve the right way of thinking about a problem, not similar facts. Debugging-branch v1 slice."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "cognee>=1.2.2",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[project.scripts]
+contextify = "contextify.demo:main"
+
+[tool.setuptools.packages.find]
+include = ["contextify*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

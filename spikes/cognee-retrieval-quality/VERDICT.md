@@ -1,6 +1,6 @@
 # Cognee retrieval-quality spike — verdict
 
-Issue: `issues/01-cognee-retrieval-quality-spike.md`. Full numbers in `results.json`; fixture set in `fixtures.py`; frameworks in `frameworks.py`; runner in `run_spike.py`.
+Issue: `issues/done/slice0-cognee-retrieval-quality-spike.md`. Full numbers in `results.json`; fixture set in `fixtures.py`; frameworks in `frameworks.py`; runner in `run_spike.py`.
 
 ## Setup
 
@@ -26,10 +26,10 @@ With a hand-written 4-field abstraction, Cognee's embedding space resolved every
 
 The raw-text top-1 failures were not embedding-space confusions between conceptually adjacent frameworks (e.g. mixing up two Testing frameworks); they were cases where the raw description simply never says the words that matter — e.g. `ff1-a` and `ff2-b` both need `binary_search_bisection` but describe the regression narratively ("started throwing an error this week", "no longer updates instantly") without ever surfacing "I have an ordered, bisectable range of commits/deploys," which is exactly the fact the abstraction schema forces into the open.
 
-**Implication for issue 02 (tracer bullet):** proceed with building Problem Abstraction as designed — it is the load-bearing stage the PRD flagged, and this spike shows it earns its keep. Do not spend more effort tuning embeddings/retrieval mechanics before the abstraction stage exists; the 100% top-3 ceiling on abstracted schema suggests retrieval mechanics are already sufficient at this seed-tree size.
+**Implication for Slice 1 (tracer bullet):** proceed with building Problem Abstraction as designed — it is the load-bearing stage the PRD flagged, and this spike shows it earns its keep. Do not spend more effort tuning embeddings/retrieval mechanics before the abstraction stage exists; the 100% top-3 ceiling on abstracted schema suggests retrieval mechanics are already sufficient at this seed-tree size.
 
 ## Caveats
 
 - n=20 at a 6-framework tree; accuracy will need re-validation as the tree grows past single-call descent (already noted as deferred in the PRD).
-- The 4-field schemas here were hand-written by the same person who wrote the fixtures — this measures the *ceiling* achievable once abstraction is done well, not whether an LLM call can reliably produce equally good abstractions from raw text. That's issue 02's problem to validate.
+- The 4-field schemas here were hand-written by the same person who wrote the fixtures — this measures the *ceiling* achievable once abstraction is done well, not whether an LLM call can reliably produce equally good abstractions from raw text. That's Slice 1's problem to validate.
 - `SearchType.CHUNKS` performs its own internal query rewrite before the vector search (visible in logs), so this isn't a raw embedding-distance measurement in the strictest sense — it reflects Cognee's actual retrieval behavior as a system, which is what the PRD's go/no-go question is actually about.
