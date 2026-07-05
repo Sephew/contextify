@@ -1,0 +1,29 @@
+# Secrets — never commit
+.env
+*.key
+
+# Cognee local databases / system dirs
+.cognee_system/
+.data/
+cognee_data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Editor / OS
+.DS_Store
+.idea/
