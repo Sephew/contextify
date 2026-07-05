@@ -12,41 +12,61 @@ similarity.
 Full design context: [`framework-retrieval-system.md`](framework-retrieval-system.md),
 glossary in [`CONTEXT.md`](CONTEXT.md).
 
-## Why memory infrastructure is its own sector
+## Cognee Usage
 
-LLMs are stateless. Every call starts from zero — no memory of past problems,
-past decisions, or what actually worked. The industry's first answer was RAG:
-embed documents, retrieve the nearest chunks, stuff them in the prompt. That
-retrieves *similar text*. It does not retrieve *structure* — how entities
-relate, what caused what, which approach was validated and which was abandoned.
+Cognee is the persistent memory this project's framework store runs on. The
+whole framework tree lives as Cognee documents, and every operation Contextify
+needs — seed, read, single-item lookup, and write-back — maps onto Cognee's v1
+memory API (`remember()` / `recall()` / `forget()`). See
+[`framework_store/store.py`](contextify/framework_store/store.py) for the full
+`CogneeMemoryStore`.
 
-**Memory infrastructure** (the sector Cognee sits in) is the layer that gives
-agents a persistent, queryable, relational memory instead of a bag of chunks.
-It matters because:
+**Seed — one framework per document, tagged by id.** Each `Framework` is stored
+as a JSON document under a `node_set` keyed on its id, so it can be recalled
+individually later:
 
-- **Agents need continuity, not recall.** A useful agent remembers that it
-  already tried approach X and it failed — a relationship between problem and
-  outcome, not a similar-looking paragraph. That's a graph, not a vector list.
-- **Knowledge is relational.** Real reasoning traverses connections (cause →
-  effect, problem → framework → result). A knowledge graph makes those edges
-  first-class and traversable; pure vector search flattens them away.
-- **Write-back closes the loop.** Systems that improve need to record outcomes
-  and feed them into the next retrieval. Memory infrastructure treats writing
-  learned facts back as a core operation, not an afterthought.
-- **It's the missing OS layer for agents.** Compute (models) and tools (MCP,
-  function calling) are commoditizing fast; durable, structured memory is the
-  differentiator that turns a one-shot chatbot into an agent that compounds
-  what it learns.
+```python
+await cognee.forget(dataset=self.DATASET)          # idempotent replace
+for f in frameworks:
+    await cognee.remember(
+        self._to_document(f), dataset_name=self.DATASET, node_set=[f.id]
+    )
+```
 
-Cognee provides this as a library: it builds a knowledge graph + vector store
-over your data and exposes `remember()` / `recall()` to write and query it.
+**Read — recall by chunk.** Reads go through `recall()` with an explicit
+`query_type=SearchType.CHUNKS`; `.text` returns the exact JSON document that was
+stored, which is parsed straight back into `Framework` objects. Passing
+`node_name=[framework_id]` narrows the recall server-side to a single framework:
 
-**Where this project fits.** Contextify is a concrete use case for that sector:
-a memory that stores *reasoning frameworks* (ways of thinking) as a graph, and
-`reflect()` writes outcomes back so retrieval gets better with use — exactly the
-continuity-and-write-back loop generic RAG can't express. See the
-[Framework Store](#framework-store-a-finding-worth-knowing) section for how the
-Cognee-backed store is wired in.
+```python
+from cognee.modules.search.types import SearchType
+
+results = await cognee.recall(
+    query_type=SearchType.CHUNKS,       # required — default auto-route mangles JSON
+    node_name=node_name,                # None = whole tree; [id] = one framework
+    ...
+)
+frameworks = [self._from_document(r.text) for r in results]
+```
+
+**Write-back — read-modify-write under the same `node_set`.** Confidence
+updates, status changes, and validated-success counters are done by recalling
+the current document, mutating it, deleting the old chunk, then re-`remember()`ing
+it. (A bare re-`remember()` *appends* a chunk rather than replacing it, so the
+old one is `forget()`-ed by `data_id` first.)
+
+```python
+await cognee.forget(data_id=uuid.UUID(data_id), dataset=self.DATASET)
+await cognee.remember(
+    self._to_document(current), dataset_name=self.DATASET, node_set=[current.id]
+)
+```
+
+This is the loop that makes the store *learn*: `reflect()` writes outcomes back
+into Cognee, so later retrievals see updated confidence and promoted frameworks
+— not a static index. Details and the validated-working status of this backend
+are in the [Framework Store](#framework-store-a-finding-worth-knowing) section
+below.
 
 ## Setup
 
