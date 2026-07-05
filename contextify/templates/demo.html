@@ -337,6 +337,25 @@
   }
   .draft-note strong { font-weight: 600; }
   .draft-note code { background: var(--line); padding: 0 0.25rem; border-radius: 2px; }
+  .draft-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+  .draft-actions button {
+    font-family: "IBM Plex Sans", sans-serif; font-weight: 600; font-size: 0.78rem;
+    padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; border: 1px solid var(--blue);
+  }
+  .draft-actions button[data-draft-use] { background: var(--blue); color: #fff; }
+  .draft-actions button[data-draft-keep],
+  .draft-actions button[data-draft-edit] { background: none; color: var(--blue); }
+  .draft-actions button:disabled { opacity: 0.5; cursor: default; }
+  .draft-edit { margin-top: 0.85rem; display: flex; flex-direction: column; gap: 0.4rem; }
+  .draft-edit label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); }
+  .draft-edit input, .draft-edit textarea {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.78rem;
+    padding: 0.4rem 0.5rem; border: 1px solid var(--line-2); border-radius: 3px;
+    background: var(--paper); color: var(--ink);
+  }
+  .draft-edit textarea { min-height: 4.5rem; resize: vertical; }
+  .draft-edit .row { display: flex; gap: 0.5rem; }
+  .draft-status { margin-top: 0.55rem; font-size: 0.72rem; color: var(--ink-2); }
 
   /* ---- solve-with-framework ------------------------------------------- */
   .solve-block { margin-top: 1.4rem; padding-top: 1.25rem; border-top: 1px dashed var(--line-2); }
@@ -656,6 +675,13 @@ async function apiPost(path, body) {
   return data;
 }
 
+async function apiDelete(path) {
+  const res = await fetch(BASE + path, { method: 'DELETE', headers: { 'X-API-Key': API_KEY } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || res.status);
+  return data;
+}
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -850,10 +876,30 @@ function renderResult(data, rawInput) {
   const cacheNote = data.cache_hit
     ? ` · served from path cache` : '';
   const draftNote = data.drafted_framework_id
-    ? `<div class="draft-note">Confidence was low, so a new <strong>provisional</strong> framework
-         <code>${escapeHtml(data.drafted_framework_id)}</code> was drafted for this problem shape and
-         added to the tree below. It enters the promotion gate — eligible for retrieval now,
-         promoted to trusted after 3 validated successes.</div>` : '';
+    ? `<div class="draft-note" id="draft-note">
+         <div id="draft-msg">Confidence in the existing match was low, so a new <strong>provisional</strong> framework
+           <code>${escapeHtml(data.drafted_framework_id)}</code> was drafted for this problem shape.
+           Because the tree fit this problem poorly, the new framework is <strong>selected by default</strong> —
+           <strong>Continue</strong> to solve with it. It's unverified, so <strong>Edit</strong> it if it needs work,
+           or <strong>Disregard</strong> it to fall back to the existing framework. It promotes to trusted after 3
+           validated successes.</div>
+         <div class="draft-actions">
+           <button type="button" data-draft-use>Continue</button>
+           <button type="button" data-draft-edit>Edit New Framework</button>
+           <button type="button" data-draft-keep>Disregard New Framework</button>
+         </div>
+         <div class="draft-edit" id="draft-edit" hidden>
+           <label for="draft-name">Name</label>
+           <input id="draft-name" />
+           <label for="draft-conditions">Applies when (one per line)</label>
+           <textarea id="draft-conditions"></textarea>
+           <div class="row">
+             <button type="button" data-draft-save>Save changes</button>
+             <button type="button" data-draft-cancel>Cancel</button>
+           </div>
+         </div>
+         <div class="draft-status" id="draft-status"></div>
+       </div>` : '';
 
   resultEl.innerHTML = `
     <div class="readout">
@@ -884,9 +930,13 @@ function renderResult(data, rawInput) {
       </div>
     </div>`;
 
+  // The framework the "Solve" button acts on — retargetable to the draft below.
+  const solveTarget = { id: data.framework_id, name: data.framework_name };
   document.getElementById('solve-btn').addEventListener('click', (ev) =>
-    solveProblem(rawInput, data.framework_id, data.framework_name, ev.currentTarget)
+    solveProblem(rawInput, solveTarget.id, solveTarget.name, ev.currentTarget)
   );
+
+  if (data.drafted_framework_id) wireDraftActions(data.drafted_framework_id, solveTarget, { id: data.framework_id, name: data.framework_name });
 
   // trigger reveal + confidence fill after layout
   requestAnimationFrame(() => {
@@ -895,6 +945,104 @@ function renderResult(data, rawInput) {
     if (fill) fill.style.width = confPct + '%';
   });
   resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// --- Decide what to do with an auto-drafted provisional framework --------
+// Keep existing (discard the draft) · Use it (retarget Solve) · Edit it.
+// All three run against existing endpoints — no draft-specific backend.
+function wireDraftActions(draftId, solveTarget, existing) {
+  const note = document.getElementById('draft-note');
+  if (!note) return;
+  const statusEl = document.getElementById('draft-status');
+  const editBox = document.getElementById('draft-edit');
+  const nameInput = document.getElementById('draft-name');
+  const condInput = document.getElementById('draft-conditions');
+  const keepBtn = note.querySelector('[data-draft-keep]');
+  const useBtn = note.querySelector('[data-draft-use]');
+  const editBtn = note.querySelector('[data-draft-edit]');
+  const saveBtn = note.querySelector('[data-draft-save]');
+  const cancelBtn = note.querySelector('[data-draft-cancel]');
+
+  let node = null;          // full record, loaded lazily from /frameworks
+  let currentId = draftId;  // changes if the draft is edited (id follows name)
+
+  const setBusy = (b) => [keepBtn, useBtn, editBtn, saveBtn].forEach(x => x && (x.disabled = b));
+
+  async function loadNode() {
+    if (node && node.id === currentId) return node;
+    node = (await apiGet('/frameworks')).find(f => f.id === currentId) || null;
+    return node;
+  }
+
+  // Low confidence: the new provisional framework is the default to continue with.
+  solveTarget.id = currentId;
+  solveTarget.name = currentId;
+  const solveBtnEl = document.getElementById('solve-btn');
+  if (solveBtnEl) solveBtnEl.textContent = 'Solve with new framework';
+  loadNode().then(n => {
+    if (n && solveTarget.id === currentId) solveTarget.name = n.name;
+  });
+
+  // Disregard: drop the draft and fall back to the existing framework.
+  keepBtn.addEventListener('click', async () => {
+    setBusy(true);
+    try {
+      await apiDelete('/frameworks/' + encodeURIComponent(currentId));
+      solveTarget.id = existing.id;
+      solveTarget.name = existing.name;
+      const sb = document.getElementById('solve-btn');
+      if (sb) sb.textContent = 'Solve with this framework';
+      statusEl.textContent = 'Disregarded the new framework — continuing with the existing one.';
+      [keepBtn, useBtn, editBtn].forEach(x => x.disabled = true);
+      editBox.hidden = true;
+      loadFrameworks();
+    } catch (e) { statusEl.textContent = 'Could not discard the draft: ' + e; setBusy(false); }
+  });
+
+  // Continue: solve with the new framework straight away.
+  useBtn.addEventListener('click', async () => {
+    const n = await loadNode();
+    solveTarget.id = currentId;
+    solveTarget.name = n ? n.name : currentId;
+    const sb = document.getElementById('solve-btn');
+    if (sb) { sb.textContent = 'Solve with new framework'; sb.click(); }
+  });
+
+  editBtn.addEventListener('click', async () => {
+    const n = await loadNode();
+    if (!n) { statusEl.textContent = 'Could not load the draft to edit.'; return; }
+    nameInput.value = n.name;
+    condInput.value = (n.applicability_condition || []).join('\n');
+    editBox.hidden = false;
+  });
+
+  cancelBtn.addEventListener('click', () => { editBox.hidden = true; });
+
+  saveBtn.addEventListener('click', async () => {
+    const n = await loadNode();
+    if (!n) return;
+    const name = nameInput.value.trim();
+    if (!name) { nameInput.focus(); return; }
+    const conditions = condInput.value.split('\n').map(s => s.trim()).filter(Boolean);
+    setBusy(true);
+    try {
+      // Recreate: delete the old provisional, add the edited one (id follows the name).
+      await apiDelete('/frameworks/' + encodeURIComponent(currentId));
+      const created = await apiPost('/frameworks', {
+        name, branch: n.branch, parent: n.parent, applicability_condition: conditions,
+      });
+      const wasUsing = solveTarget.id === currentId;
+      currentId = created.id;
+      node = created;
+      if (wasUsing) { solveTarget.id = created.id; solveTarget.name = created.name; }
+      document.getElementById('draft-msg').innerHTML =
+        'Edited provisional framework <code>' + escapeHtml(created.id) + '</code> saved — still provisional until promoted.';
+      editBox.hidden = true;
+      statusEl.textContent = '';
+      setBusy(false);
+      loadFrameworks();
+    } catch (e) { statusEl.textContent = 'Could not save: ' + e; setBusy(false); }
+  });
 }
 
 // --- Solve the problem with the matched framework ------------------------
