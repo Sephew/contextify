@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Contextify — a diagnostic key for how to think</title>
+<title>Contextify — the right framework for how to think</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -297,7 +297,7 @@
     color: var(--oxblood); background: #fff; font-family: "IBM Plex Mono", monospace; font-size: 0.85rem;
   }
 
-  /* ---- the key (framework tree) -------------------------------------- */
+  /* ---- the frameworks (tree) ----------------------------------------- */
   .tree { display: flex; flex-direction: column; gap: 1.6rem; }
   .branch-group { }
   .branch-title {
@@ -443,10 +443,10 @@
 <body>
   <header class="masthead">
     <div class="wrap">
-      <div class="wordmark">Contextify <span class="edition">field guide · v1</span></div>
+      <div class="wordmark">Contextify <span class="edition">framework guide · v1</span></div>
       <nav class="nav">
         <button id="guide-btn" type="button">API</button>
-        <button id="addfw-btn" type="button">Extend the key</button>
+        <button id="addfw-btn" type="button">Add a framework</button>
       </nav>
     </div>
   </header>
@@ -454,9 +454,9 @@
   <main class="wrap">
     <!-- HERO / INTAKE -->
     <section class="hero">
-      <span class="eyebrow">A diagnostic key for how to think</span>
+      <span class="eyebrow">The right framework for how to think</span>
       <h1>Retrieve the <em>way of thinking</em>, not the answer.</h1>
-      <p class="lede">Describe a bug or a testing worry. Contextify reads it down to its shape, then walks a branching key across the Debugging and Testing branches to the reasoning framework that actually fits.</p>
+      <p class="lede">Describe a bug or a testing worry. Contextify reads it down to its shape, then walks the framework tree across the Debugging and Testing branches to the one that actually fits.</p>
 
       <div class="console">
         <div class="console-inner">
@@ -472,7 +472,7 @@
             <button type="button" data-ex="This worked yesterday and now every request returns stale data until I restart the server.">stale data</button>
           </div>
           <div class="console-actions">
-            <button class="run" id="submit">Run the key</button>
+            <button class="run" id="submit">Find the framework</button>
           </div>
         </div>
       </div>
@@ -481,22 +481,22 @@
       <div id="result"></div>
     </section>
 
-    <!-- THE KEY (framework tree) -->
+    <!-- THE FRAMEWORKS (tree) -->
     <section class="block">
       <div class="block-head">
         <span class="kn">§</span>
-        <h2>The key</h2>
-        <span class="note">Every framework retrieval walks this tree · click a leaf to inspect</span>
+        <h2>The framework tree</h2>
+        <span class="note">Every retrieval walks this tree · click a framework to inspect</span>
       </div>
       <div class="tree" id="frameworks-tree">
-        <div class="loading">reading the key…</div>
+        <div class="loading">loading frameworks…</div>
       </div>
     </section>
 
     <!-- APPENDIX: API -->
     <div id="guide-panel" class="panel">
       <h3>Call it directly</h3>
-      <p class="panel-sub">This page is a demo over the same hosted API — the key below is already filled in for you.</p>
+      <p class="panel-sub">This page is a demo over the same hosted API — the API key below is already filled in for you.</p>
 
       <div class="endpoint"><span class="verb">POST</span> /retrieve — match a problem to a framework</div>
       <pre class="curl" id="curl-retrieve"></pre>
@@ -516,7 +516,7 @@
 
     <!-- APPENDIX: ADD FRAMEWORK -->
     <div id="addfw-panel" class="panel">
-      <h3>Extend the key</h3>
+      <h3>Add a framework</h3>
       <p class="panel-sub">New frameworks enter as <strong>provisional</strong> and promote to trusted after three validated successes — the human-in-the-loop gate.</p>
       <label for="fw-name">Name</label>
       <input id="fw-name" placeholder="e.g. Rubber Duck Debugging" />
@@ -538,7 +538,7 @@
     <div class="wrap">
       <span class="mono">Contextify</span>
       <span>Debugging &amp; Testing branches</span>
-      <span>Retrieval → abstraction → key descent → framework</span>
+      <span>Problem → abstraction → framework</span>
     </div>
   </footer>
 
@@ -567,7 +567,7 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-// --- The key (framework tree) -------------------------------------------
+// --- The frameworks (tree) ----------------------------------------------
 function renderFrameworkRow(f) {
   const conditions = (f.applicability_condition || [])
     .map(c => `<li>${escapeHtml(c)}</li>`).join('') || '<li class="fw-root-note">none recorded</li>';
@@ -608,7 +608,7 @@ async function loadFrameworks() {
     populateParentSelect(frameworks);
     wireFrameworkRows();
   } catch (e) {
-    treeEl.innerHTML = `<div class="error mono">Couldn't read the key: ${e}</div>`;
+    treeEl.innerHTML = `<div class="error mono">Couldn't load frameworks: ${e}</div>`;
   }
 }
 
@@ -667,7 +667,7 @@ function logLine(text, cls = '') {
   logEl.appendChild(div);
 }
 
-// --- Run the key ---------------------------------------------------------
+// --- Find the framework --------------------------------------------------
 document.getElementById('submit').addEventListener('click', async () => {
   const input = document.getElementById('input').value.trim();
   const resultEl = document.getElementById('result');
@@ -686,7 +686,7 @@ document.getElementById('submit').addEventListener('click', async () => {
     const a = await apiPost('/abstract', { raw_input: input });
     logLine(`shape read — symptom="${a.symptom}" · reproducibility=${a.reproducibility} · goal=${a.goal_shape} · evidence=[${a.evidence_available.join(', ') || 'none'}]`, 'done');
 
-    logLine("walking the key across the Debugging + Testing branches…");
+    logLine("walking the framework tree across the Debugging + Testing branches…");
     const data = await apiPost('/retrieve', { raw_input: input });
     logLine("terminal framework reached", 'done');
 
@@ -696,7 +696,7 @@ document.getElementById('submit').addEventListener('click', async () => {
     resultEl.innerHTML = `<div class="result-error">Request failed — ${escapeHtml(String(e))}</div>`;
   } finally {
     btn.disabled = false;
-    btn.textContent = "Run the key";
+    btn.textContent = "Find the framework";
   }
 });
 
@@ -731,7 +731,7 @@ function renderResult(data) {
         <div class="field"><dt>goal shape</dt><dd>${escapeHtml(a.goal_shape)}</dd></div>
       </div>
       <div class="descent">
-        <div class="cap">Key descent</div>
+        <div class="cap">Framework path</div>
         <ol class="path">${rungs}</ol>
         <div class="verdict">
           <div class="conf-row">
