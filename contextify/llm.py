@@ -98,14 +98,31 @@ def _retrieval_prompt(abstraction: ProblemAbstraction, tree: list[Framework]) ->
         f"{_render_tree(tree)}\n\n"
         "Abstracted problem:\n"
         f"{abstraction.to_prompt_block()}\n\n"
-        "Walk the tree from the root to the single best-fit leaf in ONE pass, "
-        "testing the abstraction against each node's applicability checklist. "
+        "Score how well EACH candidate leaf's applicability checklist fits the "
+        "abstracted problem. Score every leaf INDEPENDENTLY on a 0-10 scale — do "
+        "NOT force them apart; near-ties are expected and correct when two leaves "
+        "genuinely fit the problem similarly, and a uniformly low set of scores is "
+        "the right answer when nothing fits well. Then give the single best-fit "
+        "leaf's root->leaf path.\n"
         "Output ONLY JSON:\n"
-        '{"chosen_id": "<leaf id>", "path": ["<root name>", ..., "<leaf name>"], '
-        '"confidence": <0.0-1.0>, "rationale": "<one sentence>", '
-        '"ambiguous": <true if the top two candidate leaves fit almost equally '
-        "well and no single leaf clearly dominates, false otherwise>}"
+        '{"candidates": [{"id": "<leaf id>", "fit": <0-10>}, ... the top 3 leaves, '
+        'best first], "path": ["<root name>", ..., "<best leaf name>"], '
+        '"rationale": "<one sentence>"}'
     )
+
+
+# Confidence is DERIVED from the candidate fit scores, never self-reported by the
+# model (self-reported confidence saturates at 1.0). Scores arrive normalised to
+# 0..1. A pick is confident only when the top fit is both strong AND clearly ahead
+# of the runner-up; a strong-but-tied pair reads ~0.5, a weak top reads low even
+# when it dominates.
+def _derive_confidence(top: float, runner_up: float) -> float:
+    margin = max(0.0, top - runner_up)
+    return round(top * (0.5 + 0.5 * margin), 3)
+
+
+# Below this normalised gap between the top two fits, the pick is a flagged guess.
+_LIVE_AMBIGUITY_MARGIN = 0.15
 
 
 def _extract_json(text: str) -> dict:
@@ -184,12 +201,30 @@ class OpenRouterClient:
                 _retrieval_prompt(abstraction, tree),
             )
         )
+        cands = sorted(
+            (
+                {"id": str(c["id"]), "fit": min(max(float(c["fit"]), 0.0), 10.0)}
+                for c in data.get("candidates", [])
+            ),
+            key=lambda c: c["fit"],
+            reverse=True,
+        )
+        if not cands:
+            raise ValueError(f"retrieval returned no candidates: {data!r}")
+
+        top = cands[0]["fit"] / 10.0
+        runner_up = cands[1]["fit"] / 10.0 if len(cands) > 1 else 0.0
+        # Derive the path from the tree by the chosen id — more robust than
+        # trusting the model to echo node names back correctly.
+        by_id = {f.id: f for f in tree}
+        chosen = by_id.get(cands[0]["id"])
+        path = _path_names(tree, chosen) if chosen else [str(p) for p in data.get("path", [])]
         return LLMRetrievalDecision(
-            chosen_id=str(data["chosen_id"]),
-            path=[str(p) for p in data["path"]],
-            confidence=float(data["confidence"]),
+            chosen_id=cands[0]["id"],
+            path=path,
+            confidence=_derive_confidence(top, runner_up),
             rationale=str(data.get("rationale", "")),
-            ambiguous=bool(data.get("ambiguous", False)),
+            ambiguous=len(cands) > 1 and top > 0 and (top - runner_up) <= _LIVE_AMBIGUITY_MARGIN,
         )
 
     def solve_with_framework(self, raw_text: str, framework: Framework) -> str:
