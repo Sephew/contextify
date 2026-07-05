@@ -188,6 +188,14 @@
   button.run::after { content: "↳"; font-size: 1.05em; opacity: 0.8; }
   button.run:hover { background: var(--blue); }
   button.run:disabled { background: var(--ink-3); cursor: default; }
+  a.cite {
+    font-family: "IBM Plex Sans", sans-serif; font-weight: 600; font-size: 0.95rem;
+    color: var(--ink); text-decoration: none; border: 1px solid var(--ink-3);
+    padding: 0.68rem 1.2rem; border-radius: 4px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 0.5rem; transition: border-color .15s, color .15s;
+  }
+  a.cite::before { content: "❝"; font-size: 1.05em; opacity: 0.7; }
+  a.cite:hover { border-color: var(--ink); color: var(--blue); }
 
   /* ---- trace strip ---------------------------------------------------- */
   #log {
@@ -529,6 +537,7 @@
           </div>
           <div class="console-actions">
             <button class="run" id="submit">Find the framework</button>
+            <a class="cite" href="https://github.com/Sephew/contextify" target="_blank" rel="noopener">Cite repository</a>
           </div>
         </div>
       </div>
