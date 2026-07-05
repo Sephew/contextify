@@ -17,15 +17,17 @@ from .models import FrameworkMatch, ReflectionResult
 from .problem_abstraction import abstract
 from .reflection import MatchHistory
 from .reflection import reflect as _reflect
-from .retrieval import resolve
+from .retrieval import PathCache, resolve
 
 # Process-lifetime defaults so a plain `retrieve_framework(...)` followed by
-# `reflect(match.match_id, ...)` works with no store/history threaded through by
-# hand — mirroring a real persistent Framework Store, which outlives any single
-# call. Tests that need isolation construct and pass their own store/history
-# explicitly (as the rest of the suite already does for store).
+# `reflect(match.match_id, ...)` works with no store/history/cache threaded
+# through by hand — mirroring a real persistent Framework Store, which
+# outlives any single call. Tests that need isolation construct and pass
+# their own store/history/cache explicitly (as the rest of the suite already
+# does for store).
 _default_store: FrameworkStore | None = None
 _default_history = MatchHistory()
+_default_path_cache = PathCache()
 
 
 async def _get_default_store() -> FrameworkStore:
@@ -41,6 +43,7 @@ async def aretrieve_framework(
     store: FrameworkStore | None = None,
     history: MatchHistory | None = None,
     problem_id: str | None = None,
+    cache: PathCache | None = None,
 ) -> FrameworkMatch:
     """Async core: abstract the problem, read the tree, resolve the framework.
 
@@ -52,17 +55,23 @@ async def aretrieve_framework(
     signal (PRD user story 11): pass the same value across retries against the
     same underlying problem. Defaults to a fresh id per call — i.e. no grouping
     unless the caller opts in, since inferring "same problem" from text/schema
-    similarity is Slice 5's job (path caching), not this seam's.
+    similarity is the path cache's job (below), a distinct concern.
+
+    ``cache`` lets a similar-enough abstracted schema skip the tree-descent
+    call (PRD user story 9); defaults to a process-lifetime PathCache. Check
+    ``match.cache_hit`` to see whether a call actually hit it.
     """
     llm = llm if llm is not None else MockLLMClient()
     if store is None:
         store = await _get_default_store()
     if history is None:
         history = _default_history
+    if cache is None:
+        cache = _default_path_cache
 
     abstraction = abstract(raw_input, llm)          # stage 1: one LLM call
     tree = await store.read_tree()
-    match = resolve(abstraction, tree, llm)         # stage 2: one LLM call
+    match = resolve(abstraction, tree, llm, cache=cache)  # stage 2: cached or one LLM call
     history.record(match.match_id, problem_id or match.match_id, match.framework.id)
     return match
 
@@ -73,6 +82,7 @@ def retrieve_framework(
     store: FrameworkStore | None = None,
     history: MatchHistory | None = None,
     problem_id: str | None = None,
+    cache: PathCache | None = None,
 ) -> FrameworkMatch:
     """Synchronous facade over :func:`aretrieve_framework` for CLI/simple use.
 
@@ -91,7 +101,12 @@ def retrieve_framework(
         )
     return asyncio.run(
         aretrieve_framework(
-            raw_input, llm=llm, store=store, history=history, problem_id=problem_id
+            raw_input,
+            llm=llm,
+            store=store,
+            history=history,
+            problem_id=problem_id,
+            cache=cache,
         )
     )
 

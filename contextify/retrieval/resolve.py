@@ -5,24 +5,40 @@ single call that returns the resolved root->leaf path at once — retrieval cost
 does not scale with tree depth (PRD user story 8). This module only assembles the
 call's decision into a :class:`FrameworkMatch`; the judgment lives behind the
 :class:`~contextify.llm.LLMClient` seam.
+
+A :class:`~contextify.retrieval.cache.PathCache` lets a similar-enough
+abstracted schema skip that descent call entirely (PRD user story 9) — see
+that module for what "similar enough" means.
 """
 
 from __future__ import annotations
 
 from ..llm import LLMClient
 from ..models import Framework, FrameworkMatch, ProblemAbstraction
+from .cache import PathCache
 
 
 def resolve(
     abstraction: ProblemAbstraction,
     tree: list[Framework],
     llm: LLMClient,
+    cache: PathCache | None = None,
 ) -> FrameworkMatch:
-    """Resolve the abstracted problem to a single best-fit framework."""
+    """Resolve the abstracted problem to a single best-fit framework.
+
+    Checks ``cache`` (if given) for a similar previously-resolved schema before
+    issuing a fresh tree-descent LLM call; a fresh call's result is stored back
+    into the cache for future lookups.
+    """
     if not tree:
         raise ValueError("cannot resolve against an empty framework tree")
 
-    decision = llm.resolve_framework(abstraction, tree)  # the single retrieval call
+    decision = cache.lookup(abstraction) if cache is not None else None
+    cache_hit = decision is not None
+    if decision is None:
+        decision = llm.resolve_framework(abstraction, tree)  # the single retrieval call
+        if cache is not None:
+            cache.store(abstraction, decision)
 
     by_id = {f.id: f for f in tree}
     framework = by_id.get(decision.chosen_id)
@@ -43,4 +59,5 @@ def resolve(
         abstraction=abstraction,
         rationale=decision.rationale,
         low_confidence=decision.ambiguous,
+        cache_hit=cache_hit,
     )

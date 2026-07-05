@@ -28,6 +28,7 @@ from .models import (
     Reproducibility,
 )
 from .reflection import MatchHistory
+from .retrieval import PathCache
 
 __version__ = "0.1.0"
 
@@ -49,6 +50,7 @@ __all__ = [
     "FrameworkStatus",
     "GoalShape",
     "MatchHistory",
+    "PathCache",
     "ProblemAbstraction",
     "ReflectionOutcome",
     "ReflectionResult",

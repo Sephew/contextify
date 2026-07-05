@@ -134,6 +134,9 @@ class FrameworkMatch:
     low_confidence: bool = False
     # Identifies this match for a later reflect(match_id, outcome) call.
     match_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    # True when this match came from the path cache (a similar abstracted
+    # schema was already resolved) instead of a fresh tree-descent LLM call.
+    cache_hit: bool = False
 
     @property
     def framework_name(self) -> str:
