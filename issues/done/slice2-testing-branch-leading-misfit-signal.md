@@ -1,6 +1,6 @@
 # Slice 2 — Add Testing branch + leading misfit signal
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 
