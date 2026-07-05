@@ -357,6 +357,39 @@
   .draft-edit .row { display: flex; gap: 0.5rem; }
   .draft-status { margin-top: 0.55rem; font-size: 0.72rem; color: var(--ink-2); }
 
+  /* ---- low-confidence draft modal (EDIT / Continue / Discard) --------- */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(17,17,17,0.55);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1.5rem; opacity: 0; animation: modalFade 0.16s ease forwards;
+  }
+  @keyframes modalFade { to { opacity: 1; } }
+  .modal {
+    background: var(--card); border: 1px solid var(--line-2);
+    border-top: 3px solid var(--oxblood); border-radius: 6px;
+    max-width: 30rem; width: 100%; padding: 1.5rem 1.6rem 1.4rem;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.25);
+    max-height: calc(100vh - 3rem); overflow-y: auto;
+    animation: modalRise 0.2s ease forwards;
+  }
+  @keyframes modalRise { from { transform: translateY(8px); } to { transform: translateY(0); } }
+  .modal-tag {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.62rem;
+    text-transform: uppercase; letter-spacing: 0.14em; color: var(--oxblood);
+    border: 1px solid var(--oxblood); border-radius: 2px;
+    padding: 0.12rem 0.45rem; display: inline-block;
+  }
+  .modal h3 {
+    font-family: "Fraunces", serif; font-weight: 500; font-size: 1.25rem;
+    margin: 0.7rem 0 0.5rem; letter-spacing: -0.01em;
+  }
+  .modal-body { font-size: 0.9rem; color: var(--ink-2); line-height: 1.55; margin: 0; }
+  .modal-body code { background: var(--line); padding: 0 0.25rem; border-radius: 2px; font-family: "IBM Plex Mono", monospace; }
+  .modal-body strong { color: var(--ink); font-weight: 600; }
+  .modal .draft-actions { margin-top: 1.15rem; }
+  .modal .draft-actions button { padding: 0.5rem 0.95rem; font-size: 0.82rem; }
+
   /* ---- solve-with-framework ------------------------------------------- */
   .solve-block { margin-top: 1.4rem; padding-top: 1.25rem; border-top: 1px dashed var(--line-2); }
   button.solve-btn {
@@ -875,31 +908,11 @@ function renderResult(data, rawInput) {
     ? `<div class="low-note">low confidence — the match was ambiguous</div>` : '';
   const cacheNote = data.cache_hit
     ? ` · served from path cache` : '';
+  // The interactive EDIT / Continue / Discard choice is presented in a modal
+  // (openDraftModal) that pops up before solving. This inline node just records
+  // the decision once it's made.
   const draftNote = data.drafted_framework_id
-    ? `<div class="draft-note" id="draft-note">
-         <div id="draft-msg">Confidence in the existing match was low, so a new <strong>provisional</strong> framework
-           <code>${escapeHtml(data.drafted_framework_id)}</code> was drafted for this problem shape.
-           Because the tree fit this problem poorly, the new framework is <strong>selected by default</strong> —
-           <strong>Continue</strong> to solve with it. It's unverified, so <strong>Edit</strong> it if it needs work,
-           or <strong>Disregard</strong> it to fall back to the existing framework. It promotes to trusted after 3
-           validated successes.</div>
-         <div class="draft-actions">
-           <button type="button" data-draft-use>Continue</button>
-           <button type="button" data-draft-edit>Edit New Framework</button>
-           <button type="button" data-draft-keep>Disregard New Framework</button>
-         </div>
-         <div class="draft-edit" id="draft-edit" hidden>
-           <label for="draft-name">Name</label>
-           <input id="draft-name" />
-           <label for="draft-conditions">Applies when (one per line)</label>
-           <textarea id="draft-conditions"></textarea>
-           <div class="row">
-             <button type="button" data-draft-save>Save changes</button>
-             <button type="button" data-draft-cancel>Cancel</button>
-           </div>
-         </div>
-         <div class="draft-status" id="draft-status"></div>
-       </div>` : '';
+    ? `<div class="draft-note" id="draft-summary" hidden></div>` : '';
 
   resultEl.innerHTML = `
     <div class="readout">
@@ -936,7 +949,7 @@ function renderResult(data, rawInput) {
     solveProblem(rawInput, solveTarget.id, solveTarget.name, ev.currentTarget)
   );
 
-  if (data.drafted_framework_id) wireDraftActions(data.drafted_framework_id, solveTarget, { id: data.framework_id, name: data.framework_name });
+  if (data.drafted_framework_id) openDraftModal(data.drafted_framework_id, solveTarget, { id: data.framework_id, name: data.framework_name }, confPct);
 
   // trigger reveal + confidence fill after layout
   requestAnimationFrame(() => {
@@ -947,24 +960,62 @@ function renderResult(data, rawInput) {
   resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-// --- Decide what to do with an auto-drafted provisional framework --------
-// Keep existing (discard the draft) · Use it (retarget Solve) · Edit it.
+// --- Low confidence: pop up EDIT / Continue / Discard before solving -----
+// When the tree fits poorly, /retrieve auto-drafts a provisional framework.
+// This modal forces an explicit choice *before* the problem is solved:
+//   Continue → solve with the new draft
+//   Edit     → refine the draft's name/conditions, then solve with it
+//   Discard  → delete the draft, fall back to the existing matched framework
 // All three run against existing endpoints — no draft-specific backend.
-function wireDraftActions(draftId, solveTarget, existing) {
-  const note = document.getElementById('draft-note');
-  if (!note) return;
-  const statusEl = document.getElementById('draft-status');
-  const editBox = document.getElementById('draft-edit');
-  const nameInput = document.getElementById('draft-name');
-  const condInput = document.getElementById('draft-conditions');
-  const keepBtn = note.querySelector('[data-draft-keep]');
-  const useBtn = note.querySelector('[data-draft-use]');
-  const editBtn = note.querySelector('[data-draft-edit]');
-  const saveBtn = note.querySelector('[data-draft-save]');
-  const cancelBtn = note.querySelector('[data-draft-cancel]');
+function openDraftModal(draftId, solveTarget, existing, confPct) {
+  const solveBtnEl = document.getElementById('solve-btn');
+  const summaryEl = document.getElementById('draft-summary');
+  if (solveBtnEl) solveBtnEl.disabled = true;   // gate solving until a choice is made
 
   let node = null;          // full record, loaded lazily from /frameworks
   let currentId = draftId;  // changes if the draft is edited (id follows name)
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="draft-modal-title">
+      <span class="modal-tag">Low confidence · ${confPct}%</span>
+      <h3 id="draft-modal-title">A provisional framework was drafted</h3>
+      <p class="modal-body" id="draft-msg">
+        The framework tree fit this problem poorly, so a new <strong>provisional</strong>
+        framework <code>${escapeHtml(currentId)}</code> was drafted for this problem shape.
+        Choose how to proceed before solving — <strong>Continue</strong> with it,
+        <strong>Edit</strong> it first, or <strong>Discard</strong> it and fall back to
+        <strong>${escapeHtml(existing.name)}</strong>.
+      </p>
+      <div class="draft-actions">
+        <button type="button" data-draft-use>Continue</button>
+        <button type="button" data-draft-edit>Edit</button>
+        <button type="button" data-draft-keep>Discard</button>
+      </div>
+      <div class="draft-edit" id="draft-edit" hidden>
+        <label for="draft-name">Name</label>
+        <input id="draft-name" />
+        <label for="draft-conditions">Applies when (one per line)</label>
+        <textarea id="draft-conditions"></textarea>
+        <div class="row">
+          <button type="button" data-draft-save>Save &amp; continue</button>
+          <button type="button" data-draft-cancel>Cancel</button>
+        </div>
+      </div>
+      <div class="draft-status" id="draft-status"></div>
+    </div>`;
+  document.body.appendChild(backdrop);
+
+  const statusEl = backdrop.querySelector('#draft-status');
+  const editBox = backdrop.querySelector('#draft-edit');
+  const nameInput = backdrop.querySelector('#draft-name');
+  const condInput = backdrop.querySelector('#draft-conditions');
+  const keepBtn = backdrop.querySelector('[data-draft-keep]');
+  const useBtn = backdrop.querySelector('[data-draft-use]');
+  const editBtn = backdrop.querySelector('[data-draft-edit]');
+  const saveBtn = backdrop.querySelector('[data-draft-save]');
+  const cancelBtn = backdrop.querySelector('[data-draft-cancel]');
 
   const setBusy = (b) => [keepBtn, useBtn, editBtn, saveBtn].forEach(x => x && (x.disabled = b));
 
@@ -974,50 +1025,60 @@ function wireDraftActions(draftId, solveTarget, existing) {
     return node;
   }
 
-  // Low confidence: the new provisional framework is the default to continue with.
-  solveTarget.id = currentId;
-  solveTarget.name = currentId;
-  const solveBtnEl = document.getElementById('solve-btn');
-  if (solveBtnEl) solveBtnEl.textContent = 'Solve with new framework';
-  loadNode().then(n => {
-    if (n && solveTarget.id === currentId) solveTarget.name = n.name;
+  function closeModal() {
+    document.removeEventListener('keydown', onKey);
+    backdrop.remove();
+    if (solveBtnEl) solveBtnEl.disabled = false;   // solving unlocked once a choice is made
+  }
+
+  function showSummary(html) {
+    if (!summaryEl) return;
+    summaryEl.innerHTML = html;
+    summaryEl.hidden = false;
+  }
+
+  // Continue: accept the new draft and solve with it.
+  useBtn.addEventListener('click', async () => {
+    setBusy(true);
+    const n = await loadNode();
+    solveTarget.id = currentId;
+    solveTarget.name = n ? n.name : currentId;
+    if (solveBtnEl) solveBtnEl.textContent = 'Solve with new framework';
+    showSummary(`Continuing with the new provisional framework <code>${escapeHtml(currentId)}</code> — `
+      + `unverified, promotes to trusted after 3 validated successes.`);
+    closeModal();
+    if (solveBtnEl) solveBtnEl.click();
   });
 
-  // Disregard: drop the draft and fall back to the existing framework.
+  // Discard: drop the draft, fall back to the existing matched framework (no auto-solve).
   keepBtn.addEventListener('click', async () => {
     setBusy(true);
     try {
       await apiDelete('/frameworks/' + encodeURIComponent(currentId));
       solveTarget.id = existing.id;
       solveTarget.name = existing.name;
-      const sb = document.getElementById('solve-btn');
-      if (sb) sb.textContent = 'Solve with this framework';
-      statusEl.textContent = 'Disregarded the new framework — continuing with the existing one.';
-      [keepBtn, useBtn, editBtn].forEach(x => x.disabled = true);
-      editBox.hidden = true;
+      if (solveBtnEl) solveBtnEl.textContent = 'Solve with this framework';
+      showSummary(`Discarded the drafted framework — continuing with <strong>${escapeHtml(existing.name)}</strong>.`);
       loadFrameworks();
+      closeModal();
     } catch (e) { statusEl.textContent = 'Could not discard the draft: ' + e; setBusy(false); }
   });
 
-  // Continue: solve with the new framework straight away.
-  useBtn.addEventListener('click', async () => {
-    const n = await loadNode();
-    solveTarget.id = currentId;
-    solveTarget.name = n ? n.name : currentId;
-    const sb = document.getElementById('solve-btn');
-    if (sb) { sb.textContent = 'Solve with new framework'; sb.click(); }
-  });
-
+  // Edit: reveal the form, prefilled from the draft record.
   editBtn.addEventListener('click', async () => {
+    setBusy(true);
     const n = await loadNode();
+    setBusy(false);
     if (!n) { statusEl.textContent = 'Could not load the draft to edit.'; return; }
     nameInput.value = n.name;
     condInput.value = (n.applicability_condition || []).join('\n');
     editBox.hidden = false;
+    nameInput.focus();
   });
 
-  cancelBtn.addEventListener('click', () => { editBox.hidden = true; });
+  cancelBtn.addEventListener('click', () => { editBox.hidden = true; useBtn.focus(); });
 
+  // Save & continue: recreate the draft with edits (id follows name), then solve with it.
   saveBtn.addEventListener('click', async () => {
     const n = await loadNode();
     if (!n) return;
@@ -1031,18 +1092,25 @@ function wireDraftActions(draftId, solveTarget, existing) {
       const created = await apiPost('/frameworks', {
         name, branch: n.branch, parent: n.parent, applicability_condition: conditions,
       });
-      const wasUsing = solveTarget.id === currentId;
       currentId = created.id;
       node = created;
-      if (wasUsing) { solveTarget.id = created.id; solveTarget.name = created.name; }
-      document.getElementById('draft-msg').innerHTML =
-        'Edited provisional framework <code>' + escapeHtml(created.id) + '</code> saved — still provisional until promoted.';
-      editBox.hidden = true;
-      statusEl.textContent = '';
-      setBusy(false);
+      solveTarget.id = created.id;
+      solveTarget.name = created.name;
+      if (solveBtnEl) solveBtnEl.textContent = 'Solve with new framework';
+      showSummary(`Continuing with your edited framework <code>${escapeHtml(created.id)}</code> — `
+        + `still provisional until promoted.`);
       loadFrameworks();
+      closeModal();
+      if (solveBtnEl) solveBtnEl.click();
     } catch (e) { statusEl.textContent = 'Could not save: ' + e; setBusy(false); }
   });
+
+  // Escape picks the default action (Continue) unless the edit form is open.
+  function onKey(ev) {
+    if (ev.key === 'Escape' && editBox.hidden) { ev.preventDefault(); useBtn.click(); }
+  }
+  document.addEventListener('keydown', onKey);
+  useBtn.focus();
 }
 
 // --- Solve the problem with the matched framework ------------------------
